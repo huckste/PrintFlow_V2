@@ -58,8 +58,8 @@ public class PrintScreen
             queueTable.AddRow(
                 printer.PadName,
                 printer.TotalLabels.ToString("N0"),
-                printer.Active,
-                printer.Waiting,
+                printer.Active.ToString(),
+                printer.Waiting.ToString(),
                 printer.Queue.Count.ToString(),
                 status
             );

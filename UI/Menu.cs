@@ -3,11 +3,11 @@ using Spectre.Console;
 
 namespace PrintFlow_V2.UI;
 
-public class Menu
+public class Menu(string title, List<MenuItem> items)
 {
-    private readonly string _title;
-    private readonly List<MenuItem> _items;
-    private int _selectedIndex;
+    private readonly string _title = title;
+    private readonly List<MenuItem> _items = items;
+    private int _selectedIndex = 0;
     private int _menuStartRow; // Console row where menu items start, used for partial redraws
 
     // ANSI Shadow font — "PRINT FLOW" stacked, matching LazyVim's bold block style
@@ -20,13 +20,6 @@ public class Menu
         @"██║     ██║  ██║██║██║ ╚████║   ██║    ██║     ███████╗╚██████╔╝╚███╔███╔╝",
         @"╚═╝     ╚═╝  ╚═╝╚═╝╚═╝  ╚═══╝   ╚═╝    ╚═╝     ╚══════╝ ╚═════╝  ╚══╝╚══╝ ",
     ];
-
-    public Menu(string title, List<MenuItem> items)
-    {
-        _title = title;
-        _items = items;
-        _selectedIndex = 0;
-    }
 
     /// <summary>
     /// Main loop — draws the full UI once, then listens for keypresses.
