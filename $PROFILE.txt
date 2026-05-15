@@ -1,0 +1,2 @@
+$env:DOTNET_ROOT = "C:\Program Files\dotnet"
+$env:PATH = "C:\Program Files\dotnet;" + $env:PATH

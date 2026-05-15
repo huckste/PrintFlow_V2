@@ -3,9 +3,8 @@ using Spectre.Console;
 
 namespace PrintFlow_V2.UI;
 
-public class Menu(string title, List<MenuItem> items)
+public class Menu(List<MenuItem> items)
 {
-    private readonly string _title = title;
     private readonly List<MenuItem> _items = items;
     private int _selectedIndex = 0;
     private int _menuStartRow; // Console row where menu items start, used for partial redraws

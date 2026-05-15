@@ -4,14 +4,9 @@ using Spectre.Console;
 
 namespace PrintFlow_V2.Views;
 
-public class PrintScreen
+public class PrintScreen(PrintState state)
 {
-    private readonly PrintState _state;
-
-    public PrintScreen(PrintState state)
-    {
-        _state = state;
-    }
+    private readonly PrintState _state = state;
 
     public void Show()
     {
@@ -115,13 +110,14 @@ public class PrintScreen
         List<LabelFile> files = [];
         if (selected.Contains("Select All"))
         {
-            files = _state.AvailableFiles.ToList();
+            files = [.. _state.AvailableFiles];
         }
         else
         {
-            files = _state
-                .AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName)))
-                .ToList();
+            files =
+            [
+                .. _state.AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName))),
+            ];
         }
 
         var action = AnsiConsole.Prompt(
@@ -235,11 +231,11 @@ public class PrintScreen
 
         if (toRemove.Contains("Select All"))
         {
-            files = printer.Queue.ToList();
+            files = [.. printer.Queue];
         }
         else
         {
-            files = printer.Queue.Where(f => toRemove.Any(s => s.StartsWith(f.FileName))).ToList();
+            files = [.. printer.Queue.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
         }
 
         if (files.Count > 0)
