@@ -1,3 +1,4 @@
+using System.Net;
 using PrintFlow_V2.Models;
 using PrintFlow_V2.UI;
 using Spectre.Console;
@@ -16,7 +17,12 @@ public class PrintScreen(PrintState state)
             ShowDashboard();
 
             var choice = AnsiConsole.Prompt(
-                new SelectionPrompt<string>().AddChoices("Select Files", "View Queue", "Back")
+                new SelectionPrompt<string>().AddChoices(
+                    "Select Files",
+                    "View Queue",
+                    "Send Files",
+                    "Back"
+                )
             );
 
             switch (choice)
@@ -26,6 +32,9 @@ public class PrintScreen(PrintState state)
                     break;
                 case "View Queue":
                     HandleViewQueue();
+                    break;
+                case "Send Files":
+                    HandleSendFiles();
                     break;
                 case "Back":
                     return;
@@ -42,20 +51,20 @@ public class PrintScreen(PrintState state)
             .AddColumn(new TableColumn("Printer").Centered())
             .AddColumn(new TableColumn("Labels").Centered())
             .AddColumn(new TableColumn("Active").Centered())
-            .AddColumn(new TableColumn("Waiting").Centered())
+            .AddColumn(new TableColumn("Queued").Centered())
             .AddColumn(new TableColumn("Staged").Centered())
             .AddColumn(new TableColumn("Status").Centered());
 
         foreach (var printer in _state.Printers)
         {
-            var status = printer.Queue.Count > 0 ? "[green]● Printing[/]" : "[dim]● Idle[/]";
+            var status = printer.Staged.Count > 0 ? "[green]● Printing[/]" : "[dim]● Idle[/]";
 
             queueTable.AddRow(
                 printer.PadName,
                 printer.TotalLabels.ToString("N0"),
-                printer.Active.ToString(),
-                printer.Waiting.ToString(),
-                printer.Queue.Count.ToString(),
+                printer.Active.Count.ToString(),
+                printer.Queued.Count.ToString(),
+                printer.Staged.Count.ToString(),
                 status
             );
         }
@@ -185,6 +194,8 @@ public class PrintScreen(PrintState state)
         }
     }
 
+    private void HandleSendFiles() => _state.SendStagedFiles();
+
     private void HandleViewQueue()
     {
         var printerChoice = AnsiConsole.Prompt(
@@ -202,14 +213,14 @@ public class PrintScreen(PrintState state)
 
         var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
 
-        if (printer.Queue.Count == 0)
+        if (printer.Staged.Count == 0)
         {
             AnsiConsole.MarkupLine($"[yellow]{printer.Name} queue is empty[/]");
             Console.ReadKey(true);
             return;
         }
 
-        int maxLen = printer.Queue.Max(n => n.FileName.Length);
+        int maxLen = printer.Staged.Max(n => n.FileName.Length);
         var toRemove = AnsiConsole.Prompt(
             new MultiSelectionPrompt<string>()
                 .Title($"[bold]Select files to remove from {printer.Name}[/]")
@@ -217,7 +228,7 @@ public class PrintScreen(PrintState state)
                 .Required(false)
                 .AddChoices(
                     printer
-                        .Queue.Select(f =>
+                        .Staged.Select(f =>
                             $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
                         )
                         .Prepend("Select All")
@@ -231,11 +242,11 @@ public class PrintScreen(PrintState state)
 
         if (toRemove.Contains("Select All"))
         {
-            files = [.. printer.Queue];
+            files = [.. printer.Staged];
         }
         else
         {
-            files = [.. printer.Queue.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
+            files = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
         }
 
         if (files.Count > 0)

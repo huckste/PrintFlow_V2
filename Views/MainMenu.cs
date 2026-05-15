@@ -15,15 +15,11 @@ public static class MainMenu
                 () =>
                 {
                     var state = new PrintState();
-                    (List<string> printers, int maxLen) = PrinterService.GetNames();
+                    List<Printer> printers = PrinterService.GetPrinters();
                     List<LabelFile> labels = LabelService.GetLabels();
 
                     state.AvailableFiles.AddRange(labels);
-
-                    foreach (string printer in printers)
-                    {
-                        state.Printers.Add(new Printer(printer.Split('-')[^1], printer, maxLen));
-                    }
+                    state.Printers.AddRange(printers);
 
                     var screen = new PrintScreen(state);
                     screen.Show();

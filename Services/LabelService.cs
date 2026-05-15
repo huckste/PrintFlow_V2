@@ -9,7 +9,7 @@ public class LabelService
 
     public static void CopyFiles()
     {
-        List<string> files =
+        string[] files =
         [
             .. Directory
                 .GetFiles(_labelDir)
@@ -26,55 +26,31 @@ public class LabelService
         }
     }
 
-    public static List<LabelFile> GetLabels()
+    // Trying to see if this can be used by other classes to get files that are Queued or Active
+
+    public static List<LabelFile> GetLabels(string? path = null)
     {
-        bool hasFiles = Directory.EnumerateFiles(_labelDataLoad).Any();
+        string dir = path ?? _labelDataLoad;
 
-        List<string> files = [];
-
-        if (!hasFiles)
-        {
+        if (!Directory.EnumerateFiles(_labelDataLoad).Any() && path == null)
             CopyFiles();
 
-            files =
-            [
-                .. Directory
-                    .GetFiles(_labelDir)
-                    .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
-                    .Where(f =>
-                        !Path.GetExtension(f).Equals(".SNGL")
-                        && !Path.GetExtension(f).Equals(".PKL")
-                    ),
-            ];
-        }
-        else
-        {
-            files = [.. Directory.GetFiles(_labelDataLoad)];
-        }
+        return
+        [
+            .. Directory
+                .GetFiles(dir)
+                .Select(filePath =>
+                {
+                    using var reader = new StreamReader(filePath);
+                    string? firstLine = reader.ReadLine();
+                    string desc = firstLine?.Split('^')[8] ?? string.Empty;
+                    int lineCount = 1;
 
-        List<LabelFile> labels = [];
+                    while (reader.ReadLine() != null)
+                        lineCount++;
 
-        foreach (string path in files)
-        {
-            using var reader = new StreamReader(path);
-            string? firstLine = reader.ReadLine();
-            string desc = string.Empty;
-
-            if (firstLine != null)
-                desc = firstLine.Split('^')[8];
-
-            string fileName = Path.GetFileName(path);
-
-            int lineCount = 1;
-
-            while (reader.ReadLine() != null)
-                lineCount++;
-
-            LabelFile label = new(fileName, desc, lineCount);
-
-            labels.Add(label);
-        }
-
-        return labels;
+                    return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
+                }),
+        ];
     }
 }

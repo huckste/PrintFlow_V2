@@ -13,7 +13,7 @@ public class PrintState
         foreach (var file in files)
         {
             AvailableFiles.Remove(file);
-            printer.Queue.Add(file);
+            printer.Staged.Add(file);
         }
     }
 
@@ -24,10 +24,28 @@ public class PrintState
     {
         foreach (var file in files)
         {
-            printer.Queue.Remove(file);
+            printer.Staged.Remove(file);
             AvailableFiles.Add(file);
         }
     }
+
+    // foreach printer get each file in the queue and move it to the correct printer dest dir
+    public void SendStagedFiles()
+    {
+        foreach (var printer in Printers)
+        {
+            foreach (LabelFile file in printer.Staged)
+            {
+                File.Move(
+                    file.FilePath,
+                    Path.Combine(printer.TestPath, Path.GetFileName(file.FilePath))
+                );
+            }
+        }
+    }
+
+    // check each printer path and grab all files in that dir
+    // Takes those files and convert to LabelFile and add to staged
 
     /// <summary>
     /// Splits a file into N equal chunks, replaces original in available list.
@@ -48,7 +66,7 @@ public class PrintState
             var count = perChunk + (i < remainder ? 1 : 0);
             AvailableFiles.Insert(
                 index + i,
-                new LabelFile($"{file.FileName}_pt{i + 1}", file.Description, count)
+                new LabelFile($"{file.FileName}_pt{i + 1}", file.FilePath, file.Description, count)
             );
         }
     }
