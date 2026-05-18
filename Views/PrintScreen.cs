@@ -1,4 +1,3 @@
-using System.Net;
 using PrintFlow_V2.Models;
 using PrintFlow_V2.UI;
 using Spectre.Console;
@@ -16,14 +15,7 @@ public class PrintScreen(PrintState state)
             AnsiConsole.Clear();
             ShowDashboard();
 
-            var choice = AnsiConsole.Prompt(
-                new SelectionPrompt<string>().AddChoices(
-                    "Select Files",
-                    "View Queue",
-                    "Send Files",
-                    "Back"
-                )
-            );
+            var choice = Prompts.SingleSelect("", ["Select Files", "View Queue", "Send Files"]);
 
             switch (choice)
             {
@@ -36,7 +28,7 @@ public class PrintScreen(PrintState state)
                 case "Send Files":
                     HandleSendFiles();
                     break;
-                case "Back":
+                case null:
                     return;
             }
         }
@@ -88,35 +80,25 @@ public class PrintScreen(PrintState state)
     {
         if (_state.AvailableFiles.Count == 0)
         {
-            AnsiConsole.MarkupLine("[yellow]No files available[/]");
-            Console.ReadKey(true);
+            Messages.Warning("No files available");
             return;
         }
 
-        var prompt = new MultiSelectionPrompt<string>()
-            .Title("[bold]Select files[/]")
-            .InstructionsText("[dim]Space to toggle, Enter to confirm (empty to cancel)[/]")
-            .Required(false);
-
-        prompt.AddChoice("Select All");
-
         int maxLen = _state.AvailableFiles.Max(n => n.FileName.Length);
-        var selected = AnsiConsole.Prompt(
-            new MultiSelectionPrompt<string>()
-                .Title("[bold]Select files[/]")
-                .InstructionsText("[dim]Space to toggle, Enter to confirm (empty to cancel)[/]")
-                .Required(false)
-                .AddChoices(
-                    _state
-                        .AvailableFiles.Select(f =>
-                            $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
-                        )
-                        .Prepend("Select All")
-                )
+
+        var selected = Prompts.MultiSelect(
+            "Select files",
+            _state.AvailableFiles.Select(f =>
+                $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
+            ),
+            "Space to toggle, Enter to confirm (empty to cancel)"
         );
-        if (selected.Count == 0)
+
+        if (selected == null)
             return;
+
         List<LabelFile> files = [];
+
         if (selected.Contains("Select All"))
         {
             files = [.. _state.AvailableFiles];
@@ -129,66 +111,53 @@ public class PrintScreen(PrintState state)
             ];
         }
 
-        var action = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title($"[bold]Action for {files.Count} file(s)[/]")
-                .AddChoices("Assign to Printer", "Split File", "Clone", "Delete", "Cancel")
+        var action = Prompts.SingleSelect(
+            "Action for {files.Count} file(s)",
+            ["Assign to Printer", "Split File", "Clone", "Delete"]
         );
 
         switch (action)
         {
             case "Assign to Printer":
-                var printerChoice = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("[bold]Select printer[/]")
-                        .AddChoices(
-                            _state.Printers.Select(p => $"{p.PadName}  ({p.TotalLabels:N0} labels)")
-                        )
+                var printerChoice = Prompts.SingleSelect(
+                    "Select printer",
+                    [.. _state.Printers.Select(p => $"{p.PadName}  ({p.TotalLabels:N0} labels)")]
                 );
+
+                if (printerChoice == null)
+                    return;
 
                 var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
                 _state.AssignToPrinter(files, printer);
-                AnsiConsole.MarkupLine(
-                    $"[green]Assigned {files.Count} file(s) to {printer.Name}[/]"
-                );
-                Console.ReadKey(true);
+
+                Messages.Success($"Assigned {files.Count} file(s) to {printer.Name}");
                 break;
 
             case "Split File":
                 if (files.Count > 1)
                 {
-                    AnsiConsole.MarkupLine("[red]Can only split one file at a time[/]");
-                    Console.ReadKey(true);
+                    Messages.Error("Can only split one file at a time");
                 }
                 else
                 {
-                    var chunks = AnsiConsole.Prompt(
-                        new TextPrompt<int>("[bold]Split into how many chunks?[/]")
-                            .DefaultValue(2)
-                            .Validate(n =>
-                                n >= 2 && n <= 100
-                                    ? ValidationResult.Success()
-                                    : ValidationResult.Error("Between 2 and 100")
-                            )
-                    );
+                    int chunks = Prompts.ValidateInt("Split into how many chunks?", 2, 2, 100);
+
                     _state.SplitFile(files[0], chunks);
-                    AnsiConsole.MarkupLine($"[green]Split into {chunks} chunks[/]");
-                    Console.ReadKey(true);
+                    Messages.Success($"Split into {chunks} chunks");
                 }
                 break;
 
             case "Clone":
                 foreach (var file in files)
                     _state.CloneFile(file);
-                AnsiConsole.MarkupLine($"[green]Cloned {files.Count} file(s)[/]");
-                Console.ReadKey(true);
+
+                Messages.Success($"Cloned {files.Count} file(s)");
                 break;
             case "Delete":
-                if (AnsiConsole.Confirm($"[red]Delete {files.Count} file(s)?[/]", false))
+                if (Prompts.Confirm($"Delete {files.Count} file(s)?", false))
                 {
                     _state.DeleteFiles(files);
-                    AnsiConsole.MarkupLine($"[green]Deleted[/]");
-                    Console.ReadKey(true);
+                    Messages.Success("Deleted");
                 }
                 break;
         }
@@ -198,44 +167,32 @@ public class PrintScreen(PrintState state)
 
     private void HandleViewQueue()
     {
-        var printerChoice = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("[bold]Select printer to view[/]")
-                .AddChoices(
-                    _state
-                        .Printers.Select(p => $"{p.PadName} ({p.TotalLabels:N0} labels)")
-                        .Append("Cancel")
-                )
+        var printerChoice = Prompts.SingleSelect(
+            "Select printer to view",
+            _state.Printers.Select(p => $"{p.PadName} ({p.TotalLabels:N0} labels)")
         );
 
-        if (printerChoice == "Cancel")
+        if (printerChoice == null)
             return;
 
         var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
 
         if (printer.Staged.Count == 0)
         {
-            AnsiConsole.MarkupLine($"[yellow]{printer.Name} queue is empty[/]");
-            Console.ReadKey(true);
+            Messages.Warning($"{printer.Name} queue is empty");
             return;
         }
 
         int maxLen = printer.Staged.Max(n => n.FileName.Length);
-        var toRemove = AnsiConsole.Prompt(
-            new MultiSelectionPrompt<string>()
-                .Title($"[bold]Select files to remove from {printer.Name}[/]")
-                .InstructionsText("[dim]Space to toggle, Enter to confirm (empty to cancel)[/]")
-                .Required(false)
-                .AddChoices(
-                    printer
-                        .Staged.Select(f =>
-                            $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
-                        )
-                        .Prepend("Select All")
-                )
+
+        var toRemove = Prompts.MultiSelect(
+            $"Select files to remove from {printer.Name}",
+            printer.Staged.Select(f =>
+                $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
+            )
         );
 
-        if (toRemove.Count == 0)
+        if (toRemove == null)
             return;
 
         List<LabelFile> files = [];

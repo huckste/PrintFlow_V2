@@ -44,9 +44,6 @@ public class PrintState
         }
     }
 
-    // check each printer path and grab all files in that dir
-    // Takes those files and convert to LabelFile and add to staged
-
     /// <summary>
     /// Splits a file into N equal chunks, replaces original in available list.
     /// </summary>
