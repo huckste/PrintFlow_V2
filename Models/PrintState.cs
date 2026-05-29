@@ -1,9 +1,22 @@
+using PrintFlow_V2.Services;
+
 namespace PrintFlow_V2.Models;
 
 public class PrintState
 {
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
+    private FolderWatcher? _watcher;
+
+    public void Initialize(string path)
+    {
+        AvailableFiles.AddRange(LabelService.GetLabels(path));
+
+        _watcher = new FolderWatcher(path);
+
+        _watcher.FileCreated += AvailableFiles.Add;
+        _watcher.FileDeleted += (label) => AvailableFiles.Remove(label);
+    }
 
     /// <summary>
     /// Moves selected files from available to a printer's queue.
@@ -36,11 +49,15 @@ public class PrintState
         {
             foreach (LabelFile file in printer.Staged)
             {
+                printer.Queued.Add(file);
+
                 File.Move(
                     file.FilePath,
                     Path.Combine(printer.TestPath, Path.GetFileName(file.FilePath))
                 );
             }
+
+            printer.Staged.Clear();
         }
     }
 

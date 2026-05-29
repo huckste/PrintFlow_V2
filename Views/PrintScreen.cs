@@ -61,19 +61,15 @@ public class PrintScreen(PrintState state)
             );
         }
 
-        AnsiConsole.WriteLine();
+        Messages.Empty(1);
         AnsiConsole.Write(Align.Center(queueTable));
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine();
+        Messages.Empty(2);
 
         AnsiConsole.Write(
             Align.Center(new Markup($"[dim]{_state.AvailableFiles.Count} file(s) available[/]"))
         );
 
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine();
-        AnsiConsole.WriteLine();
+        Messages.Empty(4);
     }
 
     private void HandleSelectFiles()
@@ -90,8 +86,7 @@ public class PrintScreen(PrintState state)
             "Select files",
             _state.AvailableFiles.Select(f =>
                 $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
-            ),
-            "Space to toggle, Enter to confirm (empty to cancel)"
+            )
         );
 
         if (selected == null)
@@ -99,20 +94,10 @@ public class PrintScreen(PrintState state)
 
         List<LabelFile> files = [];
 
-        if (selected.Contains("Select All"))
-        {
-            files = [.. _state.AvailableFiles];
-        }
-        else
-        {
-            files =
-            [
-                .. _state.AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName))),
-            ];
-        }
+        files = [.. _state.AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName)))];
 
         var action = Prompts.SingleSelect(
-            "Action for {files.Count} file(s)",
+            $"Action for {files.Count} file(s)",
             ["Assign to Printer", "Split File", "Clone", "Delete"]
         );
 
@@ -197,14 +182,7 @@ public class PrintScreen(PrintState state)
 
         List<LabelFile> files = [];
 
-        if (toRemove.Contains("Select All"))
-        {
-            files = [.. printer.Staged];
-        }
-        else
-        {
-            files = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
-        }
+        files = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
 
         if (files.Count > 0)
         {

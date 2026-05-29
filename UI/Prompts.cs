@@ -18,7 +18,10 @@ public class Prompts
                 .AddChoices(choices.Prepend("Select All"))
         );
 
-        return choice ?? null;
+        if (choice.Count > 0 && choice[0] == "Select All")
+            return [.. choices];
+
+        return choice.Count == 0 ? null : choice;
     }
 
     public static string? SingleSelect(string title, IEnumerable<string> choices)
@@ -29,7 +32,7 @@ public class Prompts
                 .AddChoices(choices.Append("Cancel"))
         );
 
-        return choice ?? null;
+        return choice == "Cancel" ? null : choice;
     }
 
     public static int ValidateInt(string prompt, int defaultValue, int min, int max)

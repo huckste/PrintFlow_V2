@@ -1,12 +1,11 @@
 using PrintFlow_V2.Models;
-using PrintFlow_V2.Services;
 using Spectre.Console;
 
 namespace PrintFlow_V2.Views;
 
 public static class MainMenu
 {
-    public static List<MenuItem> Items()
+    public static List<MenuItem> Items(PrintState state)
     {
         return
         [
@@ -14,13 +13,6 @@ public static class MainMenu
                 "Print",
                 () =>
                 {
-                    var state = new PrintState();
-                    List<Printer> printers = PrinterService.GetPrinters();
-                    List<LabelFile> labels = LabelService.GetLabels();
-
-                    state.AvailableFiles.AddRange(labels);
-                    state.Printers.AddRange(printers);
-
                     var screen = new PrintScreen(state);
                     screen.Show();
                 },

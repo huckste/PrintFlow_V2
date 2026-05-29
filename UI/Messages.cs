@@ -21,4 +21,12 @@ public class Messages
         AnsiConsole.MarkupLine($"[yellow]{message}[/]");
         Console.ReadKey(true);
     }
+
+    public static void Empty(int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            AnsiConsole.WriteLine();
+        }
+    }
 }

@@ -19,7 +19,7 @@ public class Panels
             .BorderStyle(new Style(borderColor))
             .Padding(6, 1);
 
-        AnsiConsole.WriteLine();
+        Messages.Empty(1);
         AnsiConsole.Write(Align.Center(panel));
         Console.ReadKey(true);
     }

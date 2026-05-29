@@ -26,8 +26,6 @@ public class LabelService
         }
     }
 
-    // Trying to see if this can be used by other classes to get files that are Queued or Active
-
     public static List<LabelFile> GetLabels(string? path = null)
     {
         string dir = path ?? _labelDataLoad;
@@ -35,22 +33,19 @@ public class LabelService
         if (!Directory.EnumerateFiles(_labelDataLoad).Any() && path == null)
             CopyFiles();
 
-        return
-        [
-            .. Directory
-                .GetFiles(dir)
-                .Select(filePath =>
-                {
-                    using var reader = new StreamReader(filePath);
-                    string? firstLine = reader.ReadLine();
-                    string desc = firstLine?.Split('^')[8] ?? string.Empty;
-                    int lineCount = 1;
+        return [.. Directory.GetFiles(dir).Select(BuildLabel)];
+    }
 
-                    while (reader.ReadLine() != null)
-                        lineCount++;
+    public static LabelFile BuildLabel(string filePath)
+    {
+        using var reader = new StreamReader(filePath);
+        string? firstLine = reader.ReadLine();
+        string desc = firstLine?.Split('^')[8] ?? string.Empty;
+        int lineCount = 1;
 
-                    return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
-                }),
-        ];
+        while (reader.ReadLine() != null)
+            lineCount++;
+
+        return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
     }
 }
