@@ -49,7 +49,7 @@ public class PrintScreen(PrintState state)
 
         foreach (var printer in _state.Printers)
         {
-            var status = printer.Staged.Count > 0 ? "[green]● Printing[/]" : "[dim]● Idle[/]";
+            var status = printer.Active.Count > 0 ? "[green]● Processing[/]" : "[dim]● Idle[/]";
 
             queueTable.AddRow(
                 printer.PadName,
@@ -148,10 +148,25 @@ public class PrintScreen(PrintState state)
         }
     }
 
-    private void HandleSendFiles() => _state.SendStagedFiles();
+    private void HandleSendFiles()
+    {
+        var printers = _state.Printers.Where(p => p.Staged.Count > 0).ToList();
+
+        if (printers.Count > 0)
+        {
+            _state.SendStagedFiles();
+        }
+        else
+        {
+            Messages.Warning("No files staged");
+        }
+    }
 
     private void HandleViewQueue()
     {
+        // Need to show the files in the QUEUED list along with the files in Staged
+        // If you want to remove a file from QUEUED you need to remove from the QUEUED list and from the Printers folder back to available
+        //
         var printerChoice = Prompts.SingleSelect(
             "Select printer to view",
             _state.Printers.Select(p => $"{p.PadName} ({p.TotalLabels:N0} labels)")
@@ -162,35 +177,74 @@ public class PrintScreen(PrintState state)
 
         var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
 
-        if (printer.Staged.Count == 0)
+        if (printer.Staged.Count == 0 && printer.Queued.Count == 0)
         {
             Messages.Warning($"{printer.Name} queue is empty");
             return;
         }
 
-        int maxLen = printer.Staged.Max(n => n.FileName.Length);
+        int maxLen = 0;
+        int stagedLen = 0;
+        int queueLen = 0;
 
-        var toRemove = Prompts.MultiSelect(
-            $"Select files to remove from {printer.Name}",
-            printer.Staged.Select(f =>
+        if (printer.Staged.Count > 0)
+            stagedLen = printer.Staged.Max(n => n.FileName.Length);
+
+        if (printer.Queued.Count > 0)
+            queueLen = printer.Queued.Max(n => n.FileName.Length);
+
+        maxLen = stagedLen > queueLen ? stagedLen : queueLen;
+
+        List<string> allFiles = [];
+
+        allFiles.AddRange([
+            .. printer.Staged.Select(f =>
                 $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"
-            )
-        );
+            ),
+        ]);
+
+        allFiles.AddRange([
+            .. printer.Queued.Select(f =>
+                $"[yellow]{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})[/]"
+            ),
+        ]);
+
+        var toRemove = Prompts.MultiSelect($"Select files to remove from {printer.Name}", allFiles);
 
         if (toRemove == null)
             return;
 
-        List<LabelFile> files = [];
+        List<Markup> markups = [];
+        List<LabelFile> stagedFiles = [];
 
-        files = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
+        stagedFiles = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
 
-        if (files.Count > 0)
+        if (stagedFiles.Count > 0)
         {
-            _state.RemoveFromQueue(files, printer);
+            _state.RemoveFromStaged(stagedFiles, printer);
 
-            var markups = files.Select((f, i) => new Markup($"{i + 1}. {f.FileName}"));
-
-            Panels.MarkupList(markups, $"Removed from {printer.Name}", "yellow", Color.Yellow);
+            markups.AddRange([
+                .. stagedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
+            ]);
         }
+
+        List<LabelFile> queuedFiles = [];
+        queuedFiles =
+        [
+            .. printer.Queued.Where(f =>
+                toRemove.Any(s => s.Replace("[yellow]", "").StartsWith(f.FileName))
+            ),
+        ];
+
+        if (queuedFiles.Count > 0)
+        {
+            _state.RemoveFromQueue(queuedFiles, printer);
+
+            markups.AddRange([
+                .. queuedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
+            ]);
+        }
+
+        Panels.MarkupList(markups, $"Removed from {printer.Name}", "yellow", Color.Yellow);
     }
 }

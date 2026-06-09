@@ -19,8 +19,21 @@ public class Panels
             .BorderStyle(new Style(borderColor))
             .Padding(6, 1);
 
-        Messages.Empty(1);
-        AnsiConsole.Write(Align.Center(panel));
+        var layout = new Layout("root").SplitRows(
+            new Layout("top"),
+            new Layout("mid"),
+            new Layout("bot")
+        );
+
+        layout["top"].Ratio(1);
+        layout["mid"].Size(markup.Count() + 4);
+        layout["bot"].Ratio(1);
+
+        layout["top"].Update(new Text(""));
+        layout["bot"].Update(new Text(""));
+        layout["mid"].Update(Align.Center(panel));
+
+        AnsiConsole.Write(layout);
         Console.ReadKey(true);
     }
 }

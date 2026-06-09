@@ -1,7 +1,5 @@
 namespace PrintFlow_V2.Models;
 
-using PrintFlow_V2.Services;
-
 public class Printer
 {
     private static readonly string _testBaseDir = @"C:\Temp\Printers";
@@ -31,33 +29,32 @@ public class Printer
         DirPath = path;
         MaxLen = maxLen;
 
-        _watcher = new FileSystemWatcher(TestPath);
+        _watcher = new FileSystemWatcher(TestPath) { EnableRaisingEvents = true };
         _watcher.Renamed += OnFileRenamed;
     }
 
     public void OnFileRenamed(object sender, RenamedEventArgs e)
     {
         string ext = Path.GetExtension(e.FullPath);
-        LabelFile? label = Queued.FirstOrDefault(l => l.FilePath == e.OldFullPath);
 
-        if (label != null)
+        if (ext == ".Processed")
         {
-            if (ext == ".Processed")
+            LabelFile? label = Queued.FirstOrDefault(l => l.FilePath == e.OldFullPath);
+
+            if (label != null)
             {
                 Queued.RemoveAll(l => l.Id == label.Id);
                 label.FilePath = e.FullPath;
                 Active.Add(label);
             }
+        }
 
-            if (ext == ".Completed")
+        if (ext == ".Completed")
+        {
+            LabelFile? label = Active.FirstOrDefault(l => l.FilePath == e.OldFullPath);
+
+            if (label != null)
                 Active.RemoveAll(l => l.Id == label.Id);
         }
     }
 }
-
-// Staged: files the user is adding
-// Queue: files in the printer dir that DON'T end in .Processed or .Complete
-// Active: files in the printer dir that DO end in .Proccessed and not .Complete
-//
-//
-// NEED: folder path for FBCOP and POP for each printer

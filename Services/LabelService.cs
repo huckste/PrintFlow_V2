@@ -1,6 +1,7 @@
 namespace PrintFlow_V2.Services;
 
 using PrintFlow_V2.Models;
+using PrintFlow_V2.UI;
 
 public class LabelService
 {
@@ -47,5 +48,24 @@ public class LabelService
             lineCount++;
 
         return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
+    }
+
+    // When a file is added to labelDataLoad there can be a race condition between trying to read the file as the file is still being written
+    // Havaing attemprts allows for a retry incase there was a race condition
+    public static LabelFile? TryBuildLabel(string filePath, int retries = 5, int delayMs = 200)
+    {
+        for (int i = 0; i < retries; i++)
+        {
+            try
+            {
+                return BuildLabel(filePath);
+            }
+            catch (IOException)
+            {
+                Thread.Sleep(delayMs);
+            }
+        }
+
+        return null;
     }
 }

@@ -20,7 +20,11 @@ public class FolderWatcher
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
     {
-        LabelFile label = LabelService.BuildLabel(e.FullPath);
+        LabelFile? label = LabelService.TryBuildLabel(e.FullPath);
+
+        if (label == null)
+            return;
+
         _cache.TryAdd(label.FilePath, label);
         FileCreated?.Invoke(label);
     }

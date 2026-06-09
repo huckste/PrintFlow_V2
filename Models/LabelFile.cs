@@ -12,9 +12,4 @@ public class LabelFile(string fileName, string filePath, string description, int
     {
         return new LabelFile($"{FileName}_copy", FilePath, Description, LabelCount);
     }
-
-    public override bool Equals(object? obj) =>
-        obj is LabelFile other && FilePath == other.FilePath;
-
-    public override int GetHashCode() => FilePath.GetHashCode();
 }
