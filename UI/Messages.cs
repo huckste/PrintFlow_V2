@@ -18,22 +18,22 @@ public class Messages
         (string symbol, string color, Color borderColor) = type switch
         {
             MessageType.Error => ("x", "red", Color.Red),
-            MessageType.Success => (":check_mark", "green", Color.Green),
-            MessageType.Warning => (":warning", "yellow", Color.Yellow),
+            MessageType.Success => (":check_mark:", "green", Color.Green),
+            MessageType.Warning => (":warning:", "yellow", Color.Yellow),
             _ => ("", "", Color.Black),
         };
 
         if (rows != null && message == null)
         {
             panel = new Panel(new Rows(rows))
-                .Header($"[{color}]{symbol}[/] {message}")
+                .Header($"[{color}] {rows.Count} {header} [/]")
                 .Border(BoxBorder.Rounded)
                 .BorderColor(borderColor)
                 .Padding(2, 1);
         }
         else
         {
-            var markup = new Markup($"[{color}]{symbol}[/] {message}");
+            var markup = new Markup($"[{color}]{symbol}[/]  {message}");
 
             panel = new Panel(markup)
                 .Header($"[{color}] {header} [/]")
@@ -64,6 +64,9 @@ public class Messages
 
     public static void Warning(Error warning) =>
         MessagePanel(MessageType.Warning, "Warning", warning.Description);
+
+    public static void Warning(string warning, string? title = null) =>
+        MessagePanel(MessageType.Warning, title ?? "Warning", warning);
 
     public static void Empty(int count)
     {

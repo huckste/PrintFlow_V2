@@ -16,7 +16,7 @@ public static class ErrorOrExtensions
         return result.Value;
     }
 
-    public static ErrorOr<T> Collect<T>(this ErrorOr<T> result, List<Error> sink)
+    public static ErrorOr<T> CollectTo<T>(this ErrorOr<T> result, List<Error> sink)
     {
         if (result.IsError)
             sink.AddRange(result.Errors);

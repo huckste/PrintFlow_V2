@@ -22,7 +22,7 @@ public static class ConfigManager
     public static bool ConfigExists() => File.Exists(_configFilePath);
 
     public static ErrorOr<Success> Create() =>
-        Save(pathSchema.Production()).Then(r => Result.Success);
+        Save(PathSchema.Production()).Then(r => Result.Success);
 
     public static ErrorOr<PathSchema> Load() =>
         Safely.Run(
@@ -68,6 +68,18 @@ public static class ConfigManager
             if (!Directory.Exists(path))
                 errors.Add(Err.NotFound(Err.NotFoundType.Directory, path));
         }
+
+        return errors.Count > 0 ? errors : Result.Success;
+    }
+
+    public static ErrorOr<Success> CreateDirectories(PathSchema pathSchema)
+    {
+        List<Error> errors = [];
+
+        foreach (string path in pathSchema.GetAllPaths())
+            Safely
+                .Run(() => Directory.CreateDirectory(path), Err.Action.Create, path)
+                .CollectTo(errors);
 
         return errors.Count > 0 ? errors : Result.Success;
     }

@@ -121,7 +121,7 @@ public class PrintScreen(PrintState state)
             case "Split File":
                 if (files.Count > 1)
                 {
-                    Messages.Error("Can only split one file at a time");
+                    Messages.Warning("Can only split one file at a time");
                 }
                 else
                 {

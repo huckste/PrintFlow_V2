@@ -35,6 +35,17 @@ public class Prompts
         return choice == "Cancel" ? null : choice;
     }
 
+    public static string? TextInput(
+        string prompt,
+        string? enterOption = null,
+        string? defaultResponse = null
+    )
+    {
+        return enterOption != null
+            ? AnsiConsole.Ask($"[dim]{prompt} ([blue]Enter[/] {enterOption}:[/]", defaultResponse)
+            : AnsiConsole.Ask($"{prompt}", defaultResponse);
+    }
+
     public static int ValidateInt(string prompt, int defaultValue, int min, int max)
     {
         return AnsiConsole.Prompt(

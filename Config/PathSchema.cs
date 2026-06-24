@@ -2,7 +2,6 @@ namespace PrintFlow_V2.Config;
 
 using PrintFlow_V2.Models;
 
-// log, archive, ind-as84 (labels pick up), ind-as11a (label drop off), label_data_load (place found labels)
 public class PathSchema
 {
     public PathDesc LabelsDir { get; set; } =
@@ -72,7 +71,7 @@ public class PathSchema
         }
 
         foreach (string printer in packingListPrinters)
-            printerPaths.Add(Path.Combine(PrinterDir.Path, printer));
+            printerPaths.Add(Path.Combine(PrinterDir.Path, Path.Combine("packing-list", printer)));
 
         return printerPaths;
     }

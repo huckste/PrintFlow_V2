@@ -1,11 +1,11 @@
-﻿using PrintFlow_V2.Models;
-using PrintFlow_V2.Services;
-using PrintFlow_V2.UI;
-using PrintFlow_V2.Views;
+﻿using PrintFlow_V2;
 
-var state = new PrintState();
-state.Printers.AddRange(PrinterService.GetPrinters());
-state.Initialize(null);
-
-var menu = new Menu(MainMenu.Items(state));
-menu.Show();
+try
+{
+    Console.OutputEncoding = System.Text.Encoding.UTF8;
+    await PrintFlowApp.Run();
+}
+catch
+{
+    throw;
+}

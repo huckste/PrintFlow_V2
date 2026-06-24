@@ -36,4 +36,11 @@ public class Panels
         AnsiConsole.Write(layout);
         Console.ReadKey(true);
     }
+
+    public static void StringList(
+        List<string> items,
+        string header,
+        string headerColor,
+        Color borderColor
+    ) => MarkupList([.. items.Select(s => new Markup($"{s}"))], header, headerColor, borderColor);
 }

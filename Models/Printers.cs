@@ -18,7 +18,9 @@ public class Printer
         + Queued.Sum(f => f.LabelCount)
         + Active.Sum(f => f.LabelCount);
 
+    // Max sure all columns are lined up
     public string PadName => Name.PadRight(MaxLen);
+
     public string TestPath => Path.Combine(_testBaseDir, Path.GetFileName(DirPath));
 
     public event Action<LabelFile>? FileRenamed;
