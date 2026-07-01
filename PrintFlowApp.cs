@@ -21,8 +21,9 @@ public class PrintFlowApp
 
         _pathSchema = ensured.Value;
 
-        var state = new PrintState();
-        state.Printers.AddRange(PrinterService.GetPrinters());
+        var state = new PrintState(_pathSchema);
+        var printerService = new PrinterService(_pathSchema);
+        state.Printers.AddRange(printerService.GetPrinters());
         state.Initialize(null);
 
         var menu = new Menu(MainMenu.Items(state));

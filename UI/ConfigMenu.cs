@@ -148,7 +148,7 @@ public class ConfigMenu(PathSchema pathSchema)
             }
         );
 
-        return false; // why return false?
+        return false;
     }
 
     private bool Load(bool isProd)

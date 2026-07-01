@@ -1,4 +1,6 @@
+using PrintFlow_V2.Config;
 using PrintFlow_V2.Models;
+using PrintFlow_V2.UI;
 using Spectre.Console;
 
 namespace PrintFlow_V2.Views;
@@ -42,6 +44,21 @@ public static class MainMenu
                 },
                 key: "e",
                 icon: "\uf021"
+            ),
+            new MenuItem(
+                "Config",
+                () =>
+                {
+                    var pathSchema = ConfigManager.Load();
+
+                    if (!pathSchema.IsError)
+                    {
+                        var configMenu = new ConfigMenu(pathSchema.Value);
+                        configMenu.Run();
+                    }
+                },
+                key: "c",
+                icon: "\uf013"
             ),
             new MenuItem(
                 "Quit",

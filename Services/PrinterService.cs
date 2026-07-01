@@ -1,25 +1,23 @@
 namespace PrintFlow_V2.Services;
 
+using PrintFlow_V2.Config;
 using PrintFlow_V2.Models;
 
-public class PrinterService
+public class PrinterService(PathSchema pathSchema)
 {
-    private static readonly string _printersDir = @"\\ind-as11a\barprn\cops";
+    public PathSchema pathSchema = pathSchema;
 
-    public static List<Printer> GetPrinters()
+    public List<Printer> GetPrinters()
     {
-        string[] printerPaths = Directory.GetDirectories(_printersDir);
-        string[] printerNames =
-        [
-            .. printerPaths.Select(printerPaths => Path.GetFileName(printerPaths)),
-        ];
+        Dictionary<string, string[]> printers = pathSchema.LabelPrintersDict();
 
-        int maxLen = printerNames.Max(name => name.Length);
+        int maxLen = printers.Max(name => name.Key.Length);
 
+        // kvp.Value[0] is the cop path and kvp.Value[1] is the pop path
         return
         [
-            .. printerPaths.Select(
-                (printerPath, i) => new Printer(printerNames[i].Split('-')[^1], printerPath, maxLen)
+            .. printers.Select(
+                (kvp, i) => new Printer(kvp.Key, kvp.Value[0], kvp.Value[1], maxLen)
             ),
         ];
     }

@@ -22,13 +22,13 @@ public class PathSchema
             TestRelative = "label_data_load",
         };
 
-    public PathDesc PrinterDir { get; set; } =
+    public PathDesc BarprnDir { get; set; } =
         new()
         {
-            Name = "Printers Directory",
-            Desc = "Directory that contains all printers",
+            Name = "Barprn Directory",
+            Desc = "Directory where printer directories for packinglist, cops, and pops are found",
             ProdRelative = @"\\ind-as11a\barprn",
-            TestRelative = "printers",
+            TestRelative = "barprn",
         };
 
     public PathDesc Archive { get; set; } =
@@ -51,27 +51,55 @@ public class PathSchema
 
     public List<string> GetPrinterPaths()
     {
-        string[] labelPrinters =
-        [
-            "IND-DC-OCE4000",
-            "IND-DC-OCE7400",
-            "IND-DC-SATOLP100R",
-            "IND-DC-SATOLP100R2",
-            "IND-DC-SOLIDF90",
-        ];
-        string[] packingListPrinters = ["IND-DC-ADM", "IND-DC-MCR"];
-        string[] labelTypes = ["pops", "cops"];
-
         List<string> printerPaths = [];
 
-        foreach (string printer in labelPrinters)
+        var labelPrinters = LabelPrintersDict();
+        var packingListPrinters = PackingListPrintersDict();
+
+        foreach (KeyValuePair<string, string[]> kvp in labelPrinters)
+            printerPaths.AddRange(kvp.Value);
+
+        foreach (KeyValuePair<string, string> kvp in packingListPrinters)
+            printerPaths.Add(kvp.Value);
+
+        return printerPaths;
+    }
+
+    public Dictionary<string, string[]> LabelPrintersDict()
+    {
+        Dictionary<string, string[]> printerPaths = [];
+
+        string[] copLabelPrinterPaths = Directory.GetDirectories(
+            Path.Combine(BarprnDir.Path, "cops")
+        );
+
+        string[] popLabelPrinterPaths = Directory.GetDirectories(
+            Path.Combine(BarprnDir.Path, "pops")
+        );
+
+        foreach (string copPath in copLabelPrinterPaths)
         {
-            foreach (string type in labelTypes)
-                printerPaths.Add(Path.Combine(PrinterDir.Path, Path.Combine(type, printer)));
+            string printerName = Path.GetFileName(copPath).Split('-')[^1];
+            string popPath = popLabelPrinterPaths.Single(p =>
+                Path.GetFileName(p).Split('-')[^1] == printerName
+            );
+
+            printerPaths.Add(printerName, [copPath, popPath]);
         }
 
-        foreach (string printer in packingListPrinters)
-            printerPaths.Add(Path.Combine(PrinterDir.Path, Path.Combine("packing-list", printer)));
+        return printerPaths;
+    }
+
+    public Dictionary<string, string> PackingListPrintersDict()
+    {
+        Dictionary<string, string> printerPaths = [];
+
+        string[] packingListPrinterPaths = Directory.GetDirectories(
+            Path.Combine(BarprnDir.Path, "packing-list")
+        );
+
+        foreach (string path in packingListPrinterPaths)
+            printerPaths.Add(Path.GetFileName(path), path);
 
         return printerPaths;
     }

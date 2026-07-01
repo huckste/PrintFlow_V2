@@ -1,21 +1,22 @@
 namespace PrintFlow_V2.Models;
 
+using PrintFlow_V2.Config;
 using PrintFlow_V2.Services;
 using PrintFlow_V2.UI;
 using Spectre.Console;
 
-public class PrintState
+public class PrintState(PathSchema pathSchema)
 {
+    public PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
     private FolderWatcher? _watcher;
-    private readonly string _labelDataLoad = @"C:/Temp/Label_Data_Load";
 
     public void Initialize(string? path)
     {
         AvailableFiles.AddRange(LabelService.GetLabels(path));
 
-        _watcher = new FolderWatcher(_labelDataLoad);
+        _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
 
         _watcher.FileCreated += label =>
         {
@@ -41,7 +42,10 @@ public class PrintState
         {
             printer.Queued.Remove(file);
 
-            string dest = Path.Combine(_labelDataLoad, Path.GetFileName(file.FilePath));
+            string dest = Path.Combine(
+                pathSchema.LabelDataLoad.Path,
+                Path.GetFileName(file.FilePath)
+            );
             File.Move(file.FilePath, dest);
 
             file.FilePath = dest;
@@ -61,6 +65,10 @@ public class PrintState
     // adjust the new path, save the new path for the current file, and move the file to the proper printer dir
     public void SendStagedFiles()
     {
+        string[] fbcopExt = [".FBCOP", ".COP", ".FOP", ".BOP"];
+        string[] popExt = [".POP", ".PCT"];
+        string printerPath = "";
+
         foreach (var printer in Printers)
         {
             List<Markup> markups = [];
@@ -68,7 +76,30 @@ public class PrintState
 
             foreach (LabelFile file in printer.Staged)
             {
-                string dest = Path.Combine(printer.TestPath, Path.GetFileName(file.FilePath));
+                string ext = Path.GetExtension(file.FilePath).ToUpper();
+
+                if (fbcopExt.Contains(ext))
+                {
+                    file.FilePath = ext switch
+                    {
+                        ".FBCOP" => file.FilePath,
+                        _ => $"{file.FilePath}.FBCOP",
+                    };
+
+                    printerPath = printer.CopPath;
+                }
+                else if (popExt.Contains(ext))
+                {
+                    file.FilePath = ext switch
+                    {
+                        ".POP" => file.FilePath,
+                        _ => $"{file.FilePath}.POP",
+                    };
+
+                    printerPath = printer.PopPath;
+                }
+
+                string dest = Path.Combine(printerPath, Path.GetFileName(file.FilePath));
                 File.Move(file.FilePath, dest);
 
                 file.FilePath = dest;
