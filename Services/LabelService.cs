@@ -1,19 +1,17 @@
 namespace PrintFlow_V2.Services;
 
+using PrintFlow_V2.Config;
 using PrintFlow_V2.Models;
 using PrintFlow_V2.UI;
 
 public class LabelService
 {
-    private static readonly string _labelDir = @"\\ind-as84\asroot$\labels";
-    private static readonly string _labelDataLoad = @"C:\Temp\Label_Data_Load";
-
-    public static void CopyFiles()
+    public static void CopyFiles(PathSchema pathSchema)
     {
         string[] files =
         [
             .. Directory
-                .GetFiles(_labelDir)
+                .GetFiles(pathSchema.LabelsDir.Path)
                 .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
                 .Where(f =>
                     !Path.GetExtension(f).Equals(".SNGL") && !Path.GetExtension(f).Equals(".PKL")
@@ -22,19 +20,15 @@ public class LabelService
 
         foreach (var file in files)
         {
-            var destFile = Path.Combine(_labelDataLoad, Path.GetFileName(file));
+            var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
         }
     }
 
-    public static List<LabelFile> GetLabels(string? path = null)
+    public static List<LabelFile> GetLabels(PathSchema pathSchema)
     {
-        string dir = path ?? _labelDataLoad;
-
-        if (!Directory.EnumerateFiles(_labelDataLoad).Any() && path == null)
-            CopyFiles();
-
-        return [.. Directory.GetFiles(dir).Select(BuildLabel)];
+        CopyFiles(pathSchema);
+        return [.. Directory.GetFiles(pathSchema.LabelDataLoad.Path).Select(BuildLabel)];
     }
 
     public static LabelFile BuildLabel(string filePath)

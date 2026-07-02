@@ -12,9 +12,9 @@ public class PrintState(PathSchema pathSchema)
     public List<Printer> Printers { get; } = [];
     private FolderWatcher? _watcher;
 
-    public void Initialize(string? path)
+    public void Initialize()
     {
-        AvailableFiles.AddRange(LabelService.GetLabels(path));
+        AvailableFiles.AddRange(LabelService.GetLabels(pathSchema));
 
         _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
 
