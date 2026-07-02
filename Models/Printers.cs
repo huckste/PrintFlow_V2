@@ -2,7 +2,8 @@ namespace PrintFlow_V2.Models;
 
 public class Printer
 {
-    private readonly FileSystemWatcher _watcher;
+    private readonly FileSystemWatcher _popWatcher;
+    private readonly FileSystemWatcher _copWatcher;
 
     public string Name { get; }
     public string PopPath { get; }
@@ -18,10 +19,7 @@ public class Printer
         + Queued.Sum(f => f.LabelCount)
         + Active.Sum(f => f.LabelCount);
 
-    // Max sure all columns are lined up
     public string PadName => Name.PadRight(MaxLen);
-
-    public event Action<LabelFile>? FileRenamed;
 
     public Printer(string name, string copPath, string popPath, int maxLen)
     {
@@ -30,9 +28,11 @@ public class Printer
         PopPath = popPath;
         MaxLen = maxLen;
 
-        _watcher = new FileSystemWatcher(copPath) { EnableRaisingEvents = true };
-        _watcher = new FileSystemWatcher(popPath) { EnableRaisingEvents = true };
-        _watcher.Renamed += OnFileRenamed;
+        _copWatcher = new FileSystemWatcher(copPath) { EnableRaisingEvents = true };
+        _popWatcher = new FileSystemWatcher(popPath) { EnableRaisingEvents = true };
+
+        _copWatcher.Renamed += OnFileRenamed;
+        _popWatcher.Renamed += OnFileRenamed;
     }
 
     public void OnFileRenamed(object sender, RenamedEventArgs e)

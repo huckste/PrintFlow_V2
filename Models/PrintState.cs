@@ -1,6 +1,8 @@
 namespace PrintFlow_V2.Models;
 
+using ErrorOr;
 using PrintFlow_V2.Config;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Services;
 using PrintFlow_V2.UI;
 using Spectre.Console;
@@ -36,21 +38,30 @@ public class PrintState(PathSchema pathSchema)
         }
     }
 
-    public void RemoveFromQueue(List<LabelFile> files, Printer printer)
+    public ErrorOr<Success> RemoveFromQueue(List<LabelFile> files, Printer printer)
     {
+        List<Error> errors = [];
+
         foreach (var file in files)
         {
-            printer.Queued.Remove(file);
-
             string dest = Path.Combine(
                 pathSchema.LabelDataLoad.Path,
                 Path.GetFileName(file.FilePath)
             );
-            File.Move(file.FilePath, dest);
 
-            file.FilePath = dest;
-            AvailableFiles.Add(file);
+            var moveFileResult = Safely
+                .Run(() => File.Move(file.FilePath, dest), Err.Action.Move, file.FilePath)
+                .CollectTo(errors);
+
+            if (!moveFileResult.IsError)
+            {
+                printer.Queued.Remove(file);
+                file.FilePath = dest;
+                AvailableFiles.Add(file);
+            }
         }
+
+        return errors.Count > 0 ? errors : Result.Success;
     }
 
     public void RemoveFromStaged(List<LabelFile> files, Printer printer)
@@ -100,7 +111,8 @@ public class PrintState(PathSchema pathSchema)
                 }
 
                 string dest = Path.Combine(printerPath, Path.GetFileName(file.FilePath));
-                File.Move(file.FilePath, dest);
+
+                Safely.Run(() => File.Move(file.FilePath, dest), Err.Action.Move, file.FilePath);
 
                 file.FilePath = dest;
 

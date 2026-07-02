@@ -2,13 +2,12 @@ namespace PrintFlow_V2.Services;
 
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Models;
-using PrintFlow_V2.UI;
 
 public class LabelService
 {
     public static void CopyFiles(PathSchema pathSchema)
     {
-        string[] files =
+        string[] todaysFiles =
         [
             .. Directory
                 .GetFiles(pathSchema.LabelsDir.Path)
@@ -18,7 +17,27 @@ public class LabelService
                 ),
         ];
 
-        foreach (var file in files)
+        var now = DateTime.Now;
+
+        string[] archiveFiles =
+        [
+            .. Directory
+                .GetFiles(pathSchema.Archive.Path)
+                .Where(f =>
+                {
+                    var info = new FileInfo(f);
+                    return info.LastWriteTime.Month == now.Month
+                        && info.LastWriteTime.Year == now.Year;
+                })
+                .Select(f => Path.GetFileName(f)),
+        ];
+
+        string[] filesNotPrinted =
+        [
+            .. todaysFiles.Where(f => !archiveFiles.Contains(Path.GetFileName(f))),
+        ];
+
+        foreach (var file in filesNotPrinted)
         {
             var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);

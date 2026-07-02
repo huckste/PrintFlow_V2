@@ -216,8 +216,18 @@ public class PrintScreen(PrintState state)
 
         List<Markup> markups = [];
         List<LabelFile> stagedFiles = [];
+        List<LabelFile> queuedFiles = [];
+
+        // TODO: need to find which display strings did not match any files in staged or queued as them must be in the active array now. Diplay to the user that they can't remvoe that file from the queue
 
         stagedFiles = [.. printer.Staged.Where(f => toRemove.Any(s => s.StartsWith(f.FileName)))];
+
+        queuedFiles =
+        [
+            .. printer.Queued.Where(f =>
+                toRemove.Any(s => s.Replace("[yellow]", "").StartsWith(f.FileName))
+            ),
+        ];
 
         if (stagedFiles.Count > 0)
         {
@@ -228,23 +238,20 @@ public class PrintScreen(PrintState state)
             ]);
         }
 
-        List<LabelFile> queuedFiles = [];
-        queuedFiles =
-        [
-            .. printer.Queued.Where(f =>
-                toRemove.Any(s => s.Replace("[yellow]", "").StartsWith(f.FileName))
-            ),
-        ];
-
         if (queuedFiles.Count > 0)
         {
-            _state.RemoveFromQueue(queuedFiles, printer);
-
-            markups.AddRange([
-                .. queuedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
-            ]);
+            _state
+                .RemoveFromQueue(queuedFiles, printer)
+                .Switch(
+                    value =>
+                        markups.AddRange([
+                            .. queuedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
+                        ]),
+                    Messages.Error
+                );
         }
 
-        Panels.MarkupList(markups, $"Removed from {printer.Name}", "yellow", Color.Yellow);
+        if (markups.Count > 0)
+            Panels.MarkupList(markups, $"Removed from {printer.Name}", "yellow", Color.Yellow);
     }
 }
