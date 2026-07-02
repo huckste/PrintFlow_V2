@@ -112,7 +112,7 @@ public class PrintScreen(PrintState state)
                 if (printerChoice == null)
                     return;
 
-                var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
+                var printer = _state.Printers.First(p => printerChoice.StartsWith(p.PadName));
                 _state.AssignToPrinter(files, printer);
 
                 Messages.Success($"Assigned {files.Count} file(s) to {printer.Name}");
@@ -175,7 +175,7 @@ public class PrintScreen(PrintState state)
         if (printerChoice == null)
             return;
 
-        var printer = _state.Printers.First(p => printerChoice.StartsWith(p.Name));
+        var printer = _state.Printers.First(p => printerChoice.StartsWith(p.PadName));
 
         if (printer.Staged.Count == 0 && printer.Queued.Count == 0)
         {
