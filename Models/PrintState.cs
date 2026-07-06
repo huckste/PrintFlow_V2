@@ -11,6 +11,9 @@ public class PrintState(PathSchema pathSchema)
     private FolderWatcher? _watcher;
     private readonly Lock _lock = new();
 
+    // TODO: add public Task InitTask { get; private set; } = Task.CompletedTask;
+    // TODO: change Initialize() to set InitTask = Task.Run(() => { ... label loading and watcher setup ... })
+    //       so the UI can show immediately and EnsureReady() in PrintScreen waits on InitTask when needed
     public void Initialize()
     {
         var labels = LabelService.GetLabels(pathSchema);

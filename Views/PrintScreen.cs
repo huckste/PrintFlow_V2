@@ -79,6 +79,7 @@ public class PrintScreen(PrintState state)
 
     private void HandleSelectFiles()
     {
+        // TODO: call EnsureReady() here — show AnsiConsole.Status spinner while _state.InitTask completes before accessing AvailableFiles
         if (_state.AvailableFiles.Count == 0)
         {
             Messages.Warning("No files available");
@@ -189,6 +190,7 @@ public class PrintScreen(PrintState state)
 
     private void HandleViewQueue()
     {
+        // TODO: call EnsureReady() here — show AnsiConsole.Status spinner while _state.InitTask completes before accessing queues
         // Need to show the files in the QUEUED list along with the files in Staged
         // If you want to remove a file from QUEUED you need to remove from the QUEUED list and from the Printers folder back to available
         //
