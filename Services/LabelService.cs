@@ -1,53 +1,94 @@
 namespace PrintFlow_V2.Services;
 
+using ErrorOr;
 using PrintFlow_V2.Config;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 
 public class LabelService
 {
-    public static void CopyFiles(PathSchema pathSchema)
+    public static ErrorOr<Success> CopyFiles(PathSchema pathSchema)
     {
-        string[] todaysFiles =
-        [
-            .. Directory
-                .GetFiles(pathSchema.LabelsDir.Path)
-                .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
-                .Where(f =>
-                    !Path.GetExtension(f).Equals(".SNGL") && !Path.GetExtension(f).Equals(".PKL")
-                ),
-        ];
+        List<Error> errors = [];
+
+        var todaysFiles = Safely
+            .Run(
+                () =>
+                {
+                    return Directory
+                        .GetFiles(pathSchema.LabelsDir.Path)
+                        .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
+                        .Where(f =>
+                            !Path.GetExtension(f).Equals(".SNGL")
+                            && !Path.GetExtension(f).Equals(".PKL")
+                        )
+                        .ToList();
+                },
+                Err.Action.Read,
+                pathSchema.LabelsDir.Path
+            )
+            .CollectTo(errors);
 
         var now = DateTime.Now;
 
-        string[] archiveFiles =
-        [
-            .. Directory
-                .GetFiles(pathSchema.Archive.Path)
-                .Where(f =>
+        var archiveFiles = Safely
+            .Run(
+                () =>
                 {
-                    var info = new FileInfo(f);
-                    return info.LastWriteTime.Month == now.Month
-                        && info.LastWriteTime.Year == now.Year;
-                })
-                .Select(f => Path.GetFileName(f)),
-        ];
+                    return Directory
+                        .GetFiles(pathSchema.Archive.Path)
+                        .Where(f =>
+                        {
+                            var info = new FileInfo(f);
+                            return info.LastWriteTime.Month == now.Month
+                                && info.LastWriteTime.Year == now.Year;
+                        })
+                        .Select(f => Path.GetFileName(f))
+                        .ToList();
+                },
+                Err.Action.Read,
+                pathSchema.Archive.Path
+            )
+            .CollectTo(errors);
 
-        string[] filesNotPrinted =
-        [
-            .. todaysFiles.Where(f => !archiveFiles.Contains(Path.GetFileName(f))),
-        ];
-
-        foreach (var file in filesNotPrinted)
+        if (!todaysFiles.IsError && !archiveFiles.IsError)
         {
-            var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
+            string[] filesNotPrinted =
+            [
+                .. todaysFiles.Value.Where(f => !archiveFiles.Value.Contains(Path.GetFileName(f))),
+            ];
+
+            foreach (var file in filesNotPrinted)
+            {
+                var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
+
+                Safely
+                    .Run(
+                        () => File.Copy(file, destFile, overwrite: true),
+                        Err.Action.Copy,
+                        destFile
+                    )
+                    .CollectTo(errors);
+            }
         }
+
+        return errors.Count > 0 ? errors : Result.Success;
     }
 
-    public static List<LabelFile> GetLabels(PathSchema pathSchema)
+    public static ErrorOr<List<LabelFile>> GetLabels(PathSchema pathSchema)
     {
-        CopyFiles(pathSchema);
-        return [.. Directory.GetFiles(pathSchema.LabelDataLoad.Path).Select(BuildLabel)];
+        List<Error> errors = [];
+        CopyFiles(pathSchema).CollectTo(errors);
+
+        var result = Safely
+            .Run(
+                () => Directory.GetFiles(pathSchema.LabelDataLoad.Path).Select(BuildLabel).ToList(),
+                Err.Action.Read,
+                pathSchema.LabelDataLoad.Path
+            )
+            .CollectTo(errors);
+
+        return errors.Count > 0 ? errors : result.Value;
     }
 
     public static LabelFile BuildLabel(string filePath)
@@ -55,7 +96,10 @@ public class LabelService
         using var reader = new StreamReader(filePath);
         string? firstLine = reader.ReadLine();
         string desc = firstLine?.Split('^')[8] ?? string.Empty;
-        int lineCount = 1;
+        int lineCount = 0;
+
+        if (firstLine != null)
+            lineCount++;
 
         while (reader.ReadLine() != null)
             lineCount++;

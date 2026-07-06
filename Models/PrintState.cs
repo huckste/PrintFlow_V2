@@ -5,7 +5,7 @@ using PrintFlow_V2.Services;
 
 public class PrintState(PathSchema pathSchema)
 {
-    public PathSchema pathSchema = pathSchema;
+    public readonly PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
     private FolderWatcher? _watcher;
@@ -13,17 +13,30 @@ public class PrintState(PathSchema pathSchema)
 
     public void Initialize()
     {
-        AvailableFiles.AddRange(LabelService.GetLabels(pathSchema));
+        var labels = LabelService.GetLabels(pathSchema);
+
+        lock (_lock)
+        {
+            if (!labels.IsError)
+                AvailableFiles.AddRange(labels.Value);
+        }
 
         _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
 
         _watcher.FileCreated += label =>
         {
-            if (!AvailableFiles.Any(f => f.FilePath == label.FilePath))
-                AvailableFiles.Add(label);
+            lock (_lock)
+            {
+                if (!AvailableFiles.Any(f => f.Id == label.Id))
+                    AvailableFiles.Add(label);
+            }
         };
 
-        _watcher.FileDeleted += (label) => AvailableFiles.Remove(label);
+        _watcher.FileDeleted += (label) =>
+        {
+            lock (_lock)
+                AvailableFiles.Remove(label);
+        };
     }
 
     public void RemoveFiles(List<LabelFile> files)
@@ -35,7 +48,7 @@ public class PrintState(PathSchema pathSchema)
     public void AddFiles(List<LabelFile> files)
     {
         lock (_lock)
-            AvailableFiles.AddRange(files.Where(f => !AvailableFiles.Contains(f)));
+            AvailableFiles.AddRange(files.Where(f => !AvailableFiles.Any(af => af.Id == f.Id)));
     }
 
     /// <summary>
