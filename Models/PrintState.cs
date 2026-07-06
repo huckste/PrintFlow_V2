@@ -1,130 +1,31 @@
 namespace PrintFlow_V2.Models;
 
-using ErrorOr;
-using PrintFlow_V2.Config;
-using PrintFlow_V2.Errors;
-using PrintFlow_V2.Services;
-using PrintFlow_V2.UI;
-using Spectre.Console;
-
-public class PrintState(PathSchema pathSchema)
+public class PrintState
 {
-    public PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
-    private FolderWatcher? _watcher;
 
-    public void Initialize()
-    {
-        AvailableFiles.AddRange(LabelService.GetLabels(pathSchema));
-
-        _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
-
-        _watcher.FileCreated += label =>
-        {
-            if (!AvailableFiles.Any(f => f.FilePath == label.FilePath))
-                AvailableFiles.Add(label);
-        };
-
-        _watcher.FileDeleted += (label) => AvailableFiles.Remove(label);
-    }
-
+    /// <summary>
+    /// Moves selected files from available to a printer's queue.
+    /// </summary>
     public void AssignToPrinter(List<LabelFile> files, Printer printer)
     {
         foreach (var file in files)
         {
             AvailableFiles.Remove(file);
-            printer.Staged.Add(file);
+            printer.Queue.Add(file);
         }
     }
 
-    public ErrorOr<Success> RemoveFromQueue(List<LabelFile> files, Printer printer)
-    {
-        List<Error> errors = [];
-
-        foreach (var file in files)
-        {
-            string dest = Path.Combine(
-                pathSchema.LabelDataLoad.Path,
-                Path.GetFileName(file.FilePath)
-            );
-
-            var moveFileResult = Safely
-                .Run(() => File.Move(file.FilePath, dest), Err.Action.Move, file.FilePath)
-                .CollectTo(errors);
-
-            if (!moveFileResult.IsError)
-            {
-                printer.Queued.Remove(file);
-                file.FilePath = dest;
-                AvailableFiles.Add(file);
-            }
-        }
-
-        return errors.Count > 0 ? errors : Result.Success;
-    }
-
-    public void RemoveFromStaged(List<LabelFile> files, Printer printer)
+    /// <summary>
+    /// Moves files from a printer's queue back to available.
+    /// </summary>
+    public void RemoveFromQueue(List<LabelFile> files, Printer printer)
     {
         foreach (var file in files)
         {
-            printer.Staged.Remove(file);
+            printer.Queue.Remove(file);
             AvailableFiles.Add(file);
-        }
-    }
-
-    // adjust the new path, save the new path for the current file, and move the file to the proper printer dir
-    public void SendStagedFiles()
-    {
-        string[] fbcopExt = [".FBCOP", ".COP", ".FOP", ".BOP"];
-        string[] popExt = [".POP", ".PCT"];
-        string printerPath = "";
-
-        foreach (var printer in Printers)
-        {
-            List<Markup> markups = [];
-            int i = 1;
-
-            foreach (LabelFile file in printer.Staged)
-            {
-                string ext = Path.GetExtension(file.FilePath).ToUpper();
-
-                if (fbcopExt.Contains(ext))
-                {
-                    file.FilePath = ext switch
-                    {
-                        ".FBCOP" => file.FilePath,
-                        _ => $"{file.FilePath}.FBCOP",
-                    };
-
-                    printerPath = printer.CopPath;
-                }
-                else if (popExt.Contains(ext))
-                {
-                    file.FilePath = ext switch
-                    {
-                        ".POP" => file.FilePath,
-                        _ => $"{file.FilePath}.POP",
-                    };
-
-                    printerPath = printer.PopPath;
-                }
-
-                string dest = Path.Combine(printerPath, Path.GetFileName(file.FilePath));
-
-                Safely.Run(() => File.Move(file.FilePath, dest), Err.Action.Move, file.FilePath);
-
-                file.FilePath = dest;
-
-                markups.Add(new Markup($"{i++}. {file.FileName}"));
-
-                printer.Queued.Add(file);
-            }
-
-            printer.Staged.Clear();
-
-            if (markups.Count > 0)
-                Panels.MarkupList(markups, $"Sent to {printer.Name}", "green", Color.Green);
         }
     }
 
@@ -134,7 +35,6 @@ public class PrintState(PathSchema pathSchema)
     public void SplitFile(LabelFile file, int chunks)
     {
         var index = AvailableFiles.IndexOf(file);
-
         if (index < 0)
             return;
 
@@ -146,10 +46,9 @@ public class PrintState(PathSchema pathSchema)
         for (var i = 0; i < chunks; i++)
         {
             var count = perChunk + (i < remainder ? 1 : 0);
-
             AvailableFiles.Insert(
                 index + i,
-                new LabelFile($"{file.FileName}_pt{i + 1}", file.FilePath, file.Description, count)
+                new LabelFile($"{file.FileName}_pt{i + 1}", file.Description, count)
             );
         }
     }
