@@ -1,5 +1,7 @@
 namespace PrintFlow_V2.Config;
 
+using ErrorOr;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 
 public class PathSchema
@@ -49,59 +51,79 @@ public class PathSchema
             TestRelative = "logs",
         };
 
-    public List<string> GetPrinterPaths()
+    public ErrorOr<List<string>> GetPrinterPaths()
     {
         List<string> printerPaths = [];
+        List<Error> errors = [];
 
-        var labelPrinters = LabelPrintersDict();
-        var packingListPrinters = PackingListPrintersDict();
+        var labelPrinters = LabelPrintersDict().CollectTo(errors);
+        var packingListPrinters = PackingListPrintersDict().CollectTo(errors);
 
-        foreach (KeyValuePair<string, string[]> kvp in labelPrinters)
-            printerPaths.AddRange(kvp.Value);
-
-        foreach (KeyValuePair<string, string> kvp in packingListPrinters)
-            printerPaths.Add(kvp.Value);
-
-        return printerPaths;
-    }
-
-    public Dictionary<string, string[]> LabelPrintersDict()
-    {
-        Dictionary<string, string[]> printerPaths = [];
-
-        string[] copLabelPrinterPaths = Directory.GetDirectories(
-            Path.Combine(BarprnDir.Path, "cops")
-        );
-
-        string[] popLabelPrinterPaths = Directory.GetDirectories(
-            Path.Combine(BarprnDir.Path, "pops")
-        );
-
-        foreach (string copPath in copLabelPrinterPaths)
+        if (!packingListPrinters.IsError && !labelPrinters.IsError)
         {
-            string printerName = Path.GetFileName(copPath).Split('-')[^1];
-            string popPath = popLabelPrinterPaths.Single(p =>
-                Path.GetFileName(p).Split('-')[^1] == printerName
-            );
+            foreach (KeyValuePair<string, string[]> kvp in labelPrinters.Value)
+                printerPaths.AddRange(kvp.Value);
 
-            printerPaths.Add(printerName, [copPath, popPath]);
+            foreach (KeyValuePair<string, string> kvp in packingListPrinters.Value)
+                printerPaths.Add(kvp.Value);
+
+            return printerPaths;
         }
 
-        return printerPaths;
+        return errors;
     }
 
-    public Dictionary<string, string> PackingListPrintersDict()
+    public ErrorOr<Dictionary<string, string[]>> LabelPrintersDict()
+    {
+        Dictionary<string, string[]> printerPaths = [];
+        List<Error> errors = [];
+
+        string copsPath = Path.Combine(BarprnDir.Path, "cops");
+        string popsPath = Path.Combine(BarprnDir.Path, "pops");
+
+        var copResult = Safely
+            .Run(() => Directory.GetDirectories(copsPath), Err.Action.Read, copsPath)
+            .CollectTo(errors);
+
+        var popResult = Safely
+            .Run(() => Directory.GetDirectories(popsPath), Err.Action.Read, popsPath)
+            .CollectTo(errors);
+
+        if (errors.Count <= 0)
+        {
+            foreach (string copPath in copResult.Value)
+            {
+                string printerName = Path.GetFileName(copPath).Split('-')[^1];
+
+                string popPath = popResult.Value.Single(p =>
+                    Path.GetFileName(p).Split('-')[^1] == printerName
+                );
+
+                printerPaths.Add(printerName, [copPath, popPath]);
+            }
+
+            return printerPaths;
+        }
+
+        return errors;
+    }
+
+    public ErrorOr<Dictionary<string, string>> PackingListPrintersDict()
     {
         Dictionary<string, string> printerPaths = [];
+        string pklPath = Path.Combine(BarprnDir.Path, "packing-lists");
 
-        string[] packingListPrinterPaths = Directory.GetDirectories(
-            Path.Combine(BarprnDir.Path, "packing-list")
-        );
+        var result = Safely.Run(() => Directory.GetDirectories(pklPath), Err.Action.Read, pklPath);
 
-        foreach (string path in packingListPrinterPaths)
-            printerPaths.Add(Path.GetFileName(path), path);
+        if (!result.IsError)
+        {
+            foreach (string path in result.Value)
+                printerPaths.Add(Path.GetFileName(path), path);
 
-        return printerPaths;
+            return printerPaths;
+        }
+
+        return result.Errors;
     }
 
     public List<PathDesc> ToList()
@@ -120,14 +142,19 @@ public class PathSchema
     public Dictionary<string, PathDesc> ToDict() =>
         ToList().ToDictionary(desc => desc.Name, desc => desc);
 
-    public List<string> GetAllPaths()
+    public ErrorOr<List<string>> GetAllPaths()
     {
         List<string> allPaths = [];
+        List<Error> errors = [];
+
+        var printerPaths = GetPrinterPaths().CollectTo(errors);
 
         allPaths.AddRange([.. ToList().Select(desc => desc.Path)]);
-        allPaths.AddRange(GetPrinterPaths());
 
-        return allPaths;
+        if (!printerPaths.IsError)
+            allPaths.AddRange(printerPaths.Value);
+
+        return errors.Count > 0 ? errors : allPaths;
     }
 
     public void Defaults(bool isTest)

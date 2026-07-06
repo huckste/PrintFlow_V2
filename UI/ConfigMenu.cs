@@ -116,37 +116,33 @@ public class ConfigMenu(PathSchema pathSchema)
     {
         Messages.Empty(1);
 
-        var result = ConfigManager.ValidatePaths(_pathSchema);
-
-        result.Switch(
-            success =>
-            {
-                Panels.StringList(
-                    _pathSchema.GetAllPaths(),
-                    "All paths valid",
-                    "green",
-                    Color.Green
-                );
-            },
-            errors =>
-            {
-                Messages.Error(errors);
-                Messages.Empty(1);
-
-                bool isOnlyMissingDirs = errors.All(e => e.Code.Contains("NotFound"));
-
-                if (isOnlyMissingDirs)
+        ConfigManager
+            .ValidatePaths(_pathSchema)
+            .Then(_ => _pathSchema.GetAllPaths())
+            .Switch(
+                value =>
                 {
-                    if (Prompts.Confirm("Create missing directories", false))
-                    {
-                        result = ConfigManager.CreateDirectories(_pathSchema);
+                    Panels.StringList(value, "All paths valid", "green", Color.Green);
+                },
+                errors =>
+                {
+                    Messages.Error(errors);
+                    Messages.Empty(1);
 
-                        if (result.IsError)
-                            Messages.Error(errors);
+                    bool isOnlyMissingDirs = errors.All(e => e.Code.Contains("NotFound"));
+
+                    if (isOnlyMissingDirs)
+                    {
+                        if (Prompts.Confirm("Create missing directories", false))
+                        {
+                            var result = ConfigManager.CreateDirectories(_pathSchema);
+
+                            if (result.IsError)
+                                Messages.Error(result.Errors);
+                        }
                     }
                 }
-            }
-        );
+            );
 
         return false;
     }

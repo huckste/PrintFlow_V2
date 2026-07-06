@@ -76,10 +76,15 @@ public static class ConfigManager
     {
         List<Error> errors = [];
 
-        foreach (string path in pathSchema.GetAllPaths())
-            Safely
-                .Run(() => Directory.CreateDirectory(path), Err.Action.Create, path)
-                .CollectTo(errors);
+        var paths = pathSchema.GetAllPaths().CollectTo(errors);
+
+        if (!paths.IsError)
+        {
+            foreach (string path in paths.Value)
+                Safely
+                    .Run(() => Directory.CreateDirectory(path), Err.Action.Create, path)
+                    .CollectTo(errors);
+        }
 
         return errors.Count > 0 ? errors : Result.Success;
     }

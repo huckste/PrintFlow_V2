@@ -1,32 +1,41 @@
 namespace PrintFlow_V2.Models;
 
-public class PrintState
+using PrintFlow_V2.Config;
+using PrintFlow_V2.Services;
+
+public class PrintState(PathSchema pathSchema)
 {
+    public PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
+    private FolderWatcher? _watcher;
+    private readonly Lock _lock = new();
 
-    /// <summary>
-    /// Moves selected files from available to a printer's queue.
-    /// </summary>
-    public void AssignToPrinter(List<LabelFile> files, Printer printer)
+    public void Initialize()
     {
-        foreach (var file in files)
+        AvailableFiles.AddRange(LabelService.GetLabels(pathSchema));
+
+        _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
+
+        _watcher.FileCreated += label =>
         {
-            AvailableFiles.Remove(file);
-            printer.Queue.Add(file);
-        }
+            if (!AvailableFiles.Any(f => f.FilePath == label.FilePath))
+                AvailableFiles.Add(label);
+        };
+
+        _watcher.FileDeleted += (label) => AvailableFiles.Remove(label);
     }
 
-    /// <summary>
-    /// Moves files from a printer's queue back to available.
-    /// </summary>
-    public void RemoveFromQueue(List<LabelFile> files, Printer printer)
+    public void RemoveFiles(List<LabelFile> files)
     {
-        foreach (var file in files)
-        {
-            printer.Queue.Remove(file);
-            AvailableFiles.Add(file);
-        }
+        lock (_lock)
+            AvailableFiles.RemoveAll(af => files.Any(f => f.Id == af.Id));
+    }
+
+    public void AddFiles(List<LabelFile> files)
+    {
+        lock (_lock)
+            AvailableFiles.AddRange(files.Where(f => !AvailableFiles.Contains(f)));
     }
 
     /// <summary>
@@ -35,6 +44,7 @@ public class PrintState
     public void SplitFile(LabelFile file, int chunks)
     {
         var index = AvailableFiles.IndexOf(file);
+
         if (index < 0)
             return;
 
@@ -46,9 +56,10 @@ public class PrintState
         for (var i = 0; i < chunks; i++)
         {
             var count = perChunk + (i < remainder ? 1 : 0);
+
             AvailableFiles.Insert(
                 index + i,
-                new LabelFile($"{file.FileName}_pt{i + 1}", file.Description, count)
+                new LabelFile($"{file.FileName}_pt{i + 1}", file.FilePath, file.Description, count)
             );
         }
     }
