@@ -80,6 +80,7 @@ public class Printer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
+        Messages.Warning($"{e}");
         string ext = Path.GetExtension(e.FullPath);
 
         if (ext == ".Processed")
