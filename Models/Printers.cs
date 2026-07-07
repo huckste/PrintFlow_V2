@@ -80,6 +80,14 @@ public class Printer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
+        File.AppendAllLines(
+            @"C:\Temp\watcher.log",
+            [
+                $"{DateTime.Now}: Renamed: {e.OldFullPath} -> {e.FullPath}",
+                $"{DateTime.Now}: Queued: {string.Join(", ", _queued.Select(l =>
+  l.FilePath))}",
+            ]
+        );
         string ext = Path.GetExtension(e.FullPath).ToUpper();
 
         if (ext == ".PROCESSED")
@@ -100,6 +108,14 @@ public class Printer
 
     private void OnFileDeleted(object sender, FileSystemEventArgs e)
     {
+        File.AppendAllLines(
+            @"C:\Temp\watcher.log",
+            [
+                $"{DateTime.Now}: Deleted: {e.FullPath}",
+                $"{DateTime.Now}: Active: {string.Join(", ", _active.Select(l =>
+  l.FilePath))}",
+            ]
+        );
         lock (_lock)
         {
             LabelFile? label = _active.FirstOrDefault(l => l.FilePath == e.FullPath);
