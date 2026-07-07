@@ -80,21 +80,15 @@ public class Printer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        File.AppendAllLines(
-            @"C:\Temp\watcher.log",
-            [
-                $"{DateTime.Now}: Renamed: {e.OldFullPath} -> {e.FullPath}",
-                $"{DateTime.Now}: Queued: {string.Join(", ", _queued.Select(l =>
-  l.FilePath))}",
-            ]
-        );
         string ext = Path.GetExtension(e.FullPath).ToUpper();
 
         if (ext == ".PROCESSED")
         {
             lock (_lock)
             {
-                LabelFile? label = _queued.FirstOrDefault(l => l.FilePath == e.OldFullPath);
+                LabelFile? label = _queued.FirstOrDefault(l =>
+                    l.FilePath.Equals(e.OldFullPath, StringComparison.OrdinalIgnoreCase)
+                );
 
                 if (label != null)
                 {
@@ -102,25 +96,38 @@ public class Printer
                     label.FilePath = e.FullPath;
                     _active.Add(label);
                 }
+
+                File.AppendAllLines(
+                    @"C:\Temp\watcher.log",
+                    [
+                        $"{DateTime.Now}: Renamed: {e.OldFullPath} -> {e.FullPath}",
+                        $"{DateTime.Now}: Queued: {string.Join(", ", _queued.Select(l =>
+                        l.FilePath))}",
+                    ]
+                );
             }
         }
     }
 
     private void OnFileDeleted(object sender, FileSystemEventArgs e)
     {
-        File.AppendAllLines(
-            @"C:\Temp\watcher.log",
-            [
-                $"{DateTime.Now}: Deleted: {e.FullPath}",
-                $"{DateTime.Now}: Active: {string.Join(", ", _active.Select(l =>
-  l.FilePath))}",
-            ]
-        );
         lock (_lock)
         {
-            LabelFile? label = _active.FirstOrDefault(l => l.FilePath == e.FullPath);
+            LabelFile? label = _active.FirstOrDefault(l =>
+                l.FilePath.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase)
+            );
+
             if (label != null)
                 _active.RemoveAll(l => l.Id == label.Id);
+
+            File.AppendAllLines(
+                @"C:\Temp\watcher.log",
+                [
+                    $"{DateTime.Now}: Deleted: {e.FullPath}",
+                    $"{DateTime.Now}: Active: {string.Join(", ", _active.Select(l =>
+                    l.FilePath))}",
+                ]
+            );
         }
     }
 
@@ -162,6 +169,24 @@ public class Printer
 
             toTarget.AddRange(toMove.Where(f => !toTarget.Any(t => t.Id == f.Id)));
             fromTarget.RemoveAll(tf => toMove.Any(f => f.Id == tf.Id));
+        }
+    }
+
+    public void MoveQueue(PrinterQueue fromQueue, PrinterQueue toQueue, LabelFile file)
+    {
+        lock (_lock)
+        {
+            var fromTarget = GetTargetQueue(fromQueue);
+            var toTarget = GetTargetQueue(toQueue);
+
+            // Need to grab the original object vs using the snapshot version
+            var toMove = fromTarget.FirstOrDefault(ft => ft.Id == file.Id);
+
+            if (toMove != null && !toTarget.Any(tt => tt.Id == toMove.Id))
+            {
+                toTarget.Add(toMove);
+                fromTarget.Remove(toMove);
+            }
         }
     }
 

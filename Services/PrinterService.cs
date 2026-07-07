@@ -106,19 +106,25 @@ public class PrinterService()
             }
 
             string dest = Path.Combine(printerPath, Path.GetFileName(destFileName));
+            string fromPath = file.FilePath;
+
+            printer.UpdateFilePath(file, dest, Printer.PrinterQueue.Staged);
+            printer.MoveQueue(Printer.PrinterQueue.Staged, Printer.PrinterQueue.Queued, file);
 
             var moveResult = Safely
-                .Run(() => File.Move(file.FilePath, dest), Err.Action.Move, file.FilePath)
+                .Run(() => File.Move(fromPath, dest), Err.Action.Move, fromPath)
                 .CollectTo(errors);
 
-            if (!moveResult.IsError)
+            if (moveResult.IsError)
             {
-                printer.UpdateFilePath(file, dest, Printer.PrinterQueue.Staged);
+                printer.UpdateFilePath(file, fromPath, Printer.PrinterQueue.Queued);
+                printer.MoveQueue(Printer.PrinterQueue.Queued, Printer.PrinterQueue.Staged, file);
+            }
+            else
+            {
                 queuedFiles.Add(file);
             }
         }
-
-        printer.MoveQueue(Printer.PrinterQueue.Staged, Printer.PrinterQueue.Queued, queuedFiles);
 
         return errors.Count > 0 ? errors : queuedFiles;
     }
