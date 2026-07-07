@@ -49,8 +49,21 @@ public class Printer
         PopPath = popPath;
         MaxLen = maxLen;
 
-        _copWatcher = new FileSystemWatcher(copPath) { EnableRaisingEvents = true };
-        _popWatcher = new FileSystemWatcher(popPath) { EnableRaisingEvents = true };
+        _copWatcher = new FileSystemWatcher(copPath)
+        {
+            EnableRaisingEvents = true,
+            InternalBufferSize = 65536,
+            NotifyFilter = NotifyFilters.FileName,
+        };
+        _popWatcher = new FileSystemWatcher(popPath)
+        {
+            EnableRaisingEvents = true,
+            InternalBufferSize = 65536,
+            NotifyFilter = NotifyFilters.FileName,
+        };
+
+        _copWatcher.Deleted += OnFileDeleted;
+        _popWatcher.Deleted += OnFileDeleted;
 
         _copWatcher.Renamed += OnFileRenamed;
         _popWatcher.Renamed += OnFileRenamed;
@@ -83,16 +96,15 @@ public class Printer
                 }
             }
         }
+    }
 
-        if (ext == ".COMPLETED" || e.FullPath.Contains("completed"))
+    private void OnFileDeleted(object sender, FileSystemEventArgs e)
+    {
+        lock (_lock)
         {
-            lock (_lock)
-            {
-                LabelFile? label = _active.FirstOrDefault(l => l.FilePath == e.OldFullPath);
-
-                if (label != null)
-                    _active.RemoveAll(l => l.Id == label.Id);
-            }
+            LabelFile? label = _active.FirstOrDefault(l => l.FilePath == e.FullPath);
+            if (label != null)
+                _active.RemoveAll(l => l.Id == label.Id);
         }
     }
 
