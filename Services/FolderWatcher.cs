@@ -7,13 +7,12 @@ using PrintFlow_V2.Models;
 
 public class FolderWatcher
 {
-    private readonly ConcurrentDictionary<string, LabelFile> _cache = [];
     private readonly FileSystemWatcher _labelDataLoadWatcher;
     private readonly FileSystemWatcher _labelsDirWatcher;
     private readonly PathSchema _pathSchema;
 
     public event Action<LabelFile>? FileCreated;
-    public event Action<LabelFile>? FileDeleted;
+    public event Action<string>? FileDeleted;
 
     public FolderWatcher(PathSchema pathSchema)
     {
@@ -51,13 +50,11 @@ public class FolderWatcher
         if (label == null)
             return;
 
-        _cache.TryAdd(label.FilePath, label);
         FileCreated?.Invoke(label);
     }
 
     private void OnFileRemoved(object sender, FileSystemEventArgs e)
     {
-        if (_cache.TryRemove(e.FullPath, out var label))
-            FileDeleted?.Invoke(label);
+        FileDeleted?.Invoke(e.FullPath);
     }
 }

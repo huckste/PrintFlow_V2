@@ -37,10 +37,15 @@ public class PrintState(PathSchema pathSchema)
             }
         };
 
-        _watcher.FileDeleted += (label) =>
+        _watcher.FileDeleted += (filePath) =>
         {
             lock (_lock)
-                AvailableFiles.Remove(label);
+            {
+                if (filePath != null)
+                    AvailableFiles.RemoveAll(af =>
+                        af.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase)
+                    );
+            }
         };
 
         // Archive file after it has been completed. Printer will send over the completed file
