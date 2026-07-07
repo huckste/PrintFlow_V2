@@ -80,10 +80,9 @@ public class Printer
 
     private void OnFileRenamed(object sender, RenamedEventArgs e)
     {
-        Messages.Warning(e.FullPath);
-        string ext = Path.GetExtension(e.FullPath);
+        string ext = Path.GetExtension(e.FullPath).ToUpper();
 
-        if (ext == ".Processed")
+        if (ext == ".PROCESSED")
         {
             lock (_lock)
             {
@@ -98,7 +97,7 @@ public class Printer
             }
         }
 
-        if (ext == ".Completed")
+        if (ext == ".COMPLETED")
         {
             lock (_lock)
             {
