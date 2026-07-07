@@ -1,5 +1,8 @@
 namespace PrintFlow_V2.Models;
 
+using ErrorOr;
+using PrintFlow_V2.UI;
+
 public class Printer
 {
     private readonly Lock _lock = new();
@@ -49,8 +52,21 @@ public class Printer
         _copWatcher = new FileSystemWatcher(copPath) { EnableRaisingEvents = true };
         _popWatcher = new FileSystemWatcher(popPath) { EnableRaisingEvents = true };
 
+        _copWatcher.Error += OnWatcherError;
+        _popWatcher.Error += OnWatcherError;
+
         _copWatcher.Renamed += OnFileRenamed;
         _popWatcher.Renamed += OnFileRenamed;
+    }
+
+    private void OnWatcherError(object s, ErrorEventArgs e)
+    {
+        var watcher = (FileSystemWatcher)s;
+
+        Messages.Warning($"{e}");
+
+        watcher.EnableRaisingEvents = false;
+        watcher.EnableRaisingEvents = true;
     }
 
     private List<LabelFile> GetTargetQueue(PrinterQueue queue) =>
