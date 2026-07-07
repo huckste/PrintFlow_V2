@@ -1,8 +1,5 @@
 namespace PrintFlow_V2.Models;
 
-using ErrorOr;
-using PrintFlow_V2.UI;
-
 public class Printer
 {
     private readonly Lock _lock = new();
@@ -17,6 +14,8 @@ public class Printer
     public string PopPath { get; }
     public string CopPath { get; }
     public int MaxLen { get; }
+
+    public event Action<LabelFile>? FileCompleted;
 
     public string Id { get; } = Guid.NewGuid().ToString("N")[..8];
 
@@ -55,6 +54,7 @@ public class Printer
             InternalBufferSize = 65536,
             NotifyFilter = NotifyFilters.FileName,
         };
+
         _popWatcher = new FileSystemWatcher(popPath)
         {
             EnableRaisingEvents = true,
@@ -113,12 +113,25 @@ public class Printer
     {
         lock (_lock)
         {
-            LabelFile? label = _active.FirstOrDefault(l =>
+            LabelFile? active = _active.FirstOrDefault(l =>
                 l.FilePath.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase)
             );
 
-            if (label != null)
-                _active.RemoveAll(l => l.Id == label.Id);
+            if (active != null)
+            {
+                _active.RemoveAll(l => l.Id == active.Id);
+
+                // when file is completed allow external code to react and archive the file
+                FileCompleted?.Invoke(active);
+            }
+
+            // If a file is deleted not due to completing or from a program operation then clear it from queue or else it will be stuck
+            LabelFile? queued = _queued.FirstOrDefault(qf =>
+                qf.FilePath.Equals(e.FullPath, StringComparison.OrdinalIgnoreCase)
+            );
+
+            if (queued != null)
+                _queued.RemoveAll(qf => qf.Id == queued.Id);
 
             File.AppendAllLines(
                 @"C:\Temp\watcher.log",

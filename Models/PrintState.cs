@@ -14,8 +14,10 @@ public class PrintState(PathSchema pathSchema)
     // TODO: add public Task InitTask { get; private set; } = Task.CompletedTask;
     // TODO: change Initialize() to set InitTask = Task.Run(() => { ... label loading and watcher setup ... })
     //       so the UI can show immediately and EnsureReady() in PrintScreen waits on InitTask when needed
-    public void Initialize()
+    public void Initialize(List<Printer> printers)
     {
+        Printers.AddRange(printers);
+
         var labels = LabelService.GetLabels(pathSchema);
 
         lock (_lock)
@@ -24,7 +26,7 @@ public class PrintState(PathSchema pathSchema)
                 AvailableFiles.AddRange(labels.Value);
         }
 
-        _watcher = new FolderWatcher(pathSchema.LabelDataLoad.Path);
+        _watcher = new FolderWatcher(pathSchema);
 
         _watcher.FileCreated += label =>
         {
@@ -40,6 +42,10 @@ public class PrintState(PathSchema pathSchema)
             lock (_lock)
                 AvailableFiles.Remove(label);
         };
+
+        // Archive file after it has been completed. Printer will send over the completed file
+        foreach (var printer in Printers)
+            printer.FileCompleted += label => LabelService.ArchiveFile(label, pathSchema);
     }
 
     public void RemoveFiles(List<LabelFile> files)

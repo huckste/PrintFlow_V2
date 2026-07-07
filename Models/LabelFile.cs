@@ -7,6 +7,7 @@ public class LabelFile(string fileName, string filePath, string description, int
     public int LabelCount { get; set; } = labelCount;
     public string FileName { get; set; } = fileName;
     public string FilePath { get; set; } = filePath;
+    public string OriginalFilePath { get; init; } = filePath;
 
     public LabelFile Clone()
     {

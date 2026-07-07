@@ -1,24 +1,50 @@
 namespace PrintFlow_V2.Services;
 
 using System.Collections.Concurrent;
+using PrintFlow_V2.Config;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 
 public class FolderWatcher
 {
     private readonly ConcurrentDictionary<string, LabelFile> _cache = [];
-    private readonly FileSystemWatcher _watcher;
+    private readonly FileSystemWatcher _labelDataLoadWatcher;
+    private readonly FileSystemWatcher _labelsDirWatcher;
+    private readonly PathSchema _pathSchema;
 
     public event Action<LabelFile>? FileCreated;
     public event Action<LabelFile>? FileDeleted;
 
-    public FolderWatcher(string path)
+    public FolderWatcher(PathSchema pathSchema)
     {
-        _watcher = new FileSystemWatcher(path) { EnableRaisingEvents = true };
-        _watcher.Created += OnFileCreated;
-        _watcher.Deleted += OnFileDeleted;
+        _labelDataLoadWatcher = new FileSystemWatcher(pathSchema.LabelDataLoad.Path)
+        {
+            EnableRaisingEvents = true,
+        };
+        _labelDataLoadWatcher.Created += OnFileAdded;
+        _labelDataLoadWatcher.Deleted += OnFileRemoved;
+
+        _labelsDirWatcher = new FileSystemWatcher(pathSchema.LabelsDir.Path)
+        {
+            EnableRaisingEvents = true,
+        };
+
+        _labelsDirWatcher.Created += OnFileCreated;
+
+        _pathSchema = pathSchema;
     }
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
+    {
+        string ext = Path.GetExtension(e.FullPath).ToUpper();
+
+        string dest = Path.Combine(_pathSchema.LabelDataLoad.Path, Path.GetFileName(e.FullPath));
+
+        if (ext != ".PKL" && ext != ".SNGL")
+            Safely.Run(() => File.Copy(e.FullPath, dest), Err.Action.Copy, dest);
+    }
+
+    private void OnFileAdded(object sender, FileSystemEventArgs e)
     {
         LabelFile? label = LabelService.TryBuildLabel(e.FullPath);
 
@@ -29,9 +55,9 @@ public class FolderWatcher
         FileCreated?.Invoke(label);
     }
 
-    private void OnFileDeleted(object sender, FileSystemEventArgs e)
+    private void OnFileRemoved(object sender, FileSystemEventArgs e)
     {
-        if (_cache.TryGetValue(e.FullPath, out var label))
+        if (_cache.TryRemove(e.FullPath, out var label))
             FileDeleted?.Invoke(label);
     }
 }

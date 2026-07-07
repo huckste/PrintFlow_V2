@@ -125,4 +125,14 @@ public class LabelService
 
         return null;
     }
+
+    public static void ArchiveFile(LabelFile file, PathSchema pathSchema)
+    {
+        string dest = Path.Combine(
+            Path.GetFileName(file.OriginalFilePath),
+            pathSchema.Archive.Path
+        );
+
+        Safely.Run(() => File.Copy(file.OriginalFilePath, dest), Err.Action.Copy, dest);
+    }
 }

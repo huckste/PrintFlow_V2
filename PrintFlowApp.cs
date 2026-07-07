@@ -26,9 +26,7 @@ public class PrintFlowApp
         var printers = PrinterService.GetPrinters(_pathSchema).LogOnError();
 
         if (!printers.IsError)
-            state.Printers.AddRange(printers.Value);
-
-        state.Initialize();
+            state.Initialize(printers.Value);
 
         var menu = new Menu(MainMenu.Items(state));
         menu.Show();
