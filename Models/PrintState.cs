@@ -8,7 +8,7 @@ public class PrintState(PathSchema pathSchema)
     public readonly PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
-    private FolderWatcher? _watcher;
+    private LabelFolderWatcher? _watcher;
     private readonly Lock _lock = new();
 
     // TODO: add public Task InitTask { get; private set; } = Task.CompletedTask;
@@ -26,7 +26,7 @@ public class PrintState(PathSchema pathSchema)
                 AvailableFiles.AddRange(labels.Value);
         }
 
-        _watcher = new FolderWatcher(pathSchema);
+        _watcher = new LabelFolderWatcher(pathSchema);
 
         _watcher.FileCreated += label =>
         {

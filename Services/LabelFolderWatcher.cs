@@ -1,11 +1,10 @@
 namespace PrintFlow_V2.Services;
 
-using System.Collections.Concurrent;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 
-public class FolderWatcher
+public class LabelFolderWatcher
 {
     private readonly FileSystemWatcher _labelDataLoadWatcher;
     private readonly FileSystemWatcher _labelsDirWatcher;
@@ -14,23 +13,24 @@ public class FolderWatcher
     public event Action<LabelFile>? FileCreated;
     public event Action<string>? FileDeleted;
 
-    public FolderWatcher(PathSchema pathSchema)
+    public LabelFolderWatcher(PathSchema pathSchema)
     {
+        _pathSchema = pathSchema;
+
         _labelDataLoadWatcher = new FileSystemWatcher(pathSchema.LabelDataLoad.Path)
         {
             EnableRaisingEvents = true,
         };
-        _labelDataLoadWatcher.Created += OnFileAdded;
-        _labelDataLoadWatcher.Deleted += OnFileRemoved;
 
         _labelsDirWatcher = new FileSystemWatcher(pathSchema.LabelsDir.Path)
         {
             EnableRaisingEvents = true,
         };
 
-        _labelsDirWatcher.Created += OnFileCreated;
+        _labelDataLoadWatcher.Created += OnFileAdded;
+        _labelDataLoadWatcher.Deleted += OnFileRemoved;
 
-        _pathSchema = pathSchema;
+        _labelsDirWatcher.Created += OnFileCreated;
     }
 
     private void OnFileCreated(object sender, FileSystemEventArgs e)
@@ -45,7 +45,7 @@ public class FolderWatcher
 
     private void OnFileAdded(object sender, FileSystemEventArgs e)
     {
-        LabelFile? label = LabelService.TryBuildLabel(e.FullPath);
+        LabelFile? label = LabelService.TryBuildLabel(_pathSchema, e.FullPath);
 
         if (label == null)
             return;

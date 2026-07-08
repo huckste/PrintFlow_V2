@@ -82,7 +82,11 @@ public class LabelService
 
         var result = Safely
             .Run(
-                () => Directory.GetFiles(pathSchema.LabelDataLoad.Path).Select(BuildLabel).ToList(),
+                () =>
+                    Directory
+                        .GetFiles(pathSchema.LabelDataLoad.Path)
+                        .Select(fp => BuildLabel(fp, pathSchema))
+                        .ToList(),
                 Err.Action.Read,
                 pathSchema.LabelDataLoad.Path
             )
@@ -91,14 +95,35 @@ public class LabelService
         return errors.Count > 0 ? errors : result.Value;
     }
 
-    public static LabelFile BuildLabel(string filePath)
+    public static LabelFile BuildLabel(string filePath, PathSchema pathSchema)
     {
+        bool isGtp = Path.GetFileName(filePath).Contains("GTP");
+
         using var reader = new StreamReader(filePath);
+
         string? firstLine = reader.ReadLine();
+        string? secondLine = reader.ReadLine();
         string desc = firstLine?.Split('^')[8] ?? string.Empty;
+
+        if (isGtp)
+        {
+            string? waveNumber = secondLine?.Split('^')[22].Trim();
+
+            if (waveNumber != null)
+            {
+                string? newDesc = GetGtpDesc(waveNumber, pathSchema);
+
+                if (newDesc != null)
+                    desc = newDesc;
+            }
+        }
+
         int lineCount = 0;
 
         if (firstLine != null)
+            lineCount++;
+
+        if (secondLine != null)
             lineCount++;
 
         while (reader.ReadLine() != null)
@@ -107,15 +132,39 @@ public class LabelService
         return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
     }
 
+    private static string? GetGtpDesc(string waveNumber, PathSchema pathSchema)
+    {
+        string? filePath = Directory
+            .GetFiles(pathSchema.LabelDataLoad.Path)
+            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber);
+
+        filePath ??= Directory
+            .GetFiles(pathSchema.LabelsDir.Path)
+            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber);
+
+        if (filePath != null)
+        {
+            using var reader = new StreamReader(filePath);
+            return reader.ReadLine()?.Split('^')[8];
+        }
+
+        return null;
+    }
+
     // When a file is added to labelDataLoad there can be a race condition between trying to read the file as the file is still being written
     // Havaing attemprts allows for a retry incase there was a race condition
-    public static LabelFile? TryBuildLabel(string filePath, int retries = 5, int delayMs = 200)
+    public static LabelFile? TryBuildLabel(
+        PathSchema pathSchema,
+        string filePath,
+        int retries = 5,
+        int delayMs = 200
+    )
     {
         for (int i = 0; i < retries; i++)
         {
             try
             {
-                return BuildLabel(filePath);
+                return BuildLabel(filePath, pathSchema);
             }
             catch (IOException)
             {
