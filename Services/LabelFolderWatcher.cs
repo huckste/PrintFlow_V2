@@ -40,7 +40,7 @@ public class LabelFolderWatcher
         string dest = Path.Combine(_pathSchema.LabelDataLoad.Path, Path.GetFileName(e.FullPath));
 
         if (ext != ".PKL" && ext != ".SNGL")
-            Safely.Run(() => File.Copy(e.FullPath, dest), Err.Action.Copy, dest);
+            Safely.Copy(e.FullPath, dest).LogOnError();
     }
 
     private void OnFileAdded(object sender, FileSystemEventArgs e)

@@ -18,10 +18,7 @@ public class LabelService
                     return Directory
                         .GetFiles(pathSchema.LabelsDir.Path)
                         .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
-                        .Where(f =>
-                            !Path.GetExtension(f).Equals(".SNGL")
-                            && !Path.GetExtension(f).Equals(".PKL")
-                        )
+                        .Where(f => !Path.GetExtension(f).Equals(".SNGL"))
                         .ToList();
                 },
                 Err.Action.Read,
@@ -61,14 +58,7 @@ public class LabelService
             foreach (var file in filesNotPrinted)
             {
                 var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
-
-                Safely
-                    .Run(
-                        () => File.Copy(file, destFile, overwrite: true),
-                        Err.Action.Copy,
-                        destFile
-                    )
-                    .CollectTo(errors);
+                Safely.Copy(file, destFile).CollectTo(errors);
             }
         }
 

@@ -22,6 +22,30 @@ public static class Safely
         }
     }
 
+    public static ErrorOr<Success> Copy(string sourceFile, string dest)
+    {
+        FileInfo file = new(sourceFile);
+        Error error = new();
+
+        for (int i = 0; i < 5; i++)
+        {
+            try
+            {
+                using (file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+
+                File.Copy(sourceFile, dest, overwrite: true);
+                return Result.Success;
+            }
+            catch (Exception ex)
+            {
+                Thread.Sleep(300);
+                error = Err.FailedTo(Err.Action.Copy, sourceFile, ex.Message);
+            }
+        }
+
+        return error;
+    }
+
     public static ErrorOr<Success> Run(
         Action action,
         Err.Action actionType,
