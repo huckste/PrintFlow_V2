@@ -15,12 +15,12 @@ public class Messages
     {
         Panel panel;
 
-        (string symbol, string color, Color borderColor) = type switch
+        (string color, Color borderColor) = type switch
         {
-            MessageType.Error => ("x", "red", Color.Red),
-            MessageType.Success => (":check_mark:", "green", Color.Green),
-            MessageType.Warning => (":warning:", "yellow", Color.Yellow),
-            _ => ("", "", Color.Black),
+            MessageType.Error => ("red", Color.Red),
+            MessageType.Success => ("green", Color.Green),
+            MessageType.Warning => ("yellow", Color.Yellow),
+            _ => ("", Color.Black),
         };
 
         if (rows != null && message == null)
@@ -33,7 +33,7 @@ public class Messages
         }
         else
         {
-            var markup = new Markup($"[{color}]{symbol}[/]  {message}");
+            var markup = new Markup($"[{color}] {message} [/]");
 
             panel = new Panel(markup)
                 .Header($"[{color}] {header} [/]")
@@ -52,7 +52,7 @@ public class Messages
     public static void Error(List<Error> errors)
     {
         var rows = errors
-            .Select(e => new Markup($"[red]x[/] {Markup.Escape(e.Description)}"))
+            .Select(e => new Markup($"[red]{Markup.Escape(e.Description)}[/]"))
             .Cast<IRenderable>()
             .ToList();
 
