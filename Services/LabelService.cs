@@ -68,7 +68,7 @@ public class LabelService
     public static ErrorOr<List<LabelFile>> GetLabels(PathSchema pathSchema)
     {
         List<Error> errors = [];
-        CopyFiles(pathSchema).CollectTo(errors);
+        CopyFiles(pathSchema).LogOnError();
 
         var result = Safely
             .Run(
