@@ -2,7 +2,6 @@
 
 try
 {
-    Console.OutputEncoding = System.Text.Encoding.UTF8;
     await PrintFlowApp.Run();
 }
 catch
