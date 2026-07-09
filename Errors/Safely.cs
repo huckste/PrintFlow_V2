@@ -31,7 +31,7 @@ public static class Safely
         {
             try
             {
-                using (file.Open(FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { }
+                using (file.Open(FileMode.Open, FileAccess.Read, FileShare.None)) { }
 
                 File.Copy(sourceFile, dest, overwrite: true);
                 return Result.Success;
