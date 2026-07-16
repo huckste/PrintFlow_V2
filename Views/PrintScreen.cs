@@ -98,9 +98,10 @@ public class PrintScreen(PrintState state)
         if (selected == null)
             return;
 
-        List<LabelFile> files = [];
-
-        files = [.. _state.AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName)))];
+        List<LabelFile> files =
+        [
+            .. _state.AvailableFiles.Where(f => selected.Any(s => s.StartsWith(f.FileName))),
+        ];
 
         var action = Prompts.SingleSelect(
             $"Action for {files.Count} file(s)",
@@ -207,6 +208,7 @@ public class PrintScreen(PrintState state)
         if (
             printer.GetQueueCount(Printer.PrinterQueue.Staged) == 0
             && printer.GetQueueCount(Printer.PrinterQueue.Queued) == 0
+            && printer.GetQueueCount(Printer.PrinterQueue.Active) == 0
         )
         {
             Messages.Warning($"{printer.Name} queue is empty");
@@ -214,81 +216,104 @@ public class PrintScreen(PrintState state)
         }
 
         int maxLen = 0;
-        int stagedLen = 0;
-        int queueLen = 0;
+        List<int> lenList = [];
 
         if (printer.GetQueueCount(Printer.PrinterQueue.Staged) > 0)
-            stagedLen = printer.MaxFileNameLength(Printer.PrinterQueue.Staged);
+            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Staged));
 
         if (printer.GetQueueCount(Printer.PrinterQueue.Queued) > 0)
-            queueLen = printer.MaxFileNameLength(Printer.PrinterQueue.Queued);
+            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Queued));
 
-        maxLen = stagedLen > queueLen ? stagedLen : queueLen;
+        if (printer.GetQueueCount(Printer.PrinterQueue.Active) > 0)
+            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Active));
 
+        maxLen = lenList.Max();
         List<string> allFiles = [];
 
-        allFiles.AddRange([
-            .. printer
-                .QueueSnapshot(Printer.PrinterQueue.Staged)
-                .Select(f => $"{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})"),
-        ]);
+        foreach (var queue in Enum.GetValues<Printer.PrinterQueue>())
+        {
+            string textColor = queue switch
+            {
+                Printer.PrinterQueue.Staged => "[white]",
+                Printer.PrinterQueue.Queued => "[yellow]",
+                Printer.PrinterQueue.Active => "[green]",
+                _ => "[grey]",
+            };
 
-        allFiles.AddRange([
-            .. printer
-                .QueueSnapshot(Printer.PrinterQueue.Queued)
-                .Select(f =>
-                    $"[yellow]{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})[/]"
-                ),
-        ]);
+            allFiles.AddRange([
+                .. printer
+                    .QueueSnapshot(queue)
+                    .Select(f =>
+                        $"{textColor}{f.FileName.PadRight(maxLen)}  {f.Description} ({f.LabelCount:N0})[/]"
+                    ),
+            ]);
+        }
 
         var toRemove = Prompts.MultiSelect($"Select files to remove from {printer.Name}", allFiles);
 
         if (toRemove == null)
             return;
 
-        List<Markup> markups = [];
-        List<LabelFile> stagedFiles = [];
-        List<LabelFile> queuedFiles = [];
+        Dictionary<string, List<Markup>> markups = [];
 
         // TODO: need to find which display strings did not match any files in staged or queued as them must be in the active array now. Diplay to the user that they can't remvoe that file from the queue
 
-        stagedFiles =
-        [
-            .. printer
-                .QueueSnapshot(Printer.PrinterQueue.Staged)
-                .Where(f => toRemove.Any(s => s.StartsWith(f.FileName))),
-        ];
-
-        queuedFiles =
-        [
-            .. printer
-                .QueueSnapshot(Printer.PrinterQueue.Queued)
-                .Where(f => toRemove.Any(s => s.Replace("[yellow]", "").StartsWith(f.FileName))),
-        ];
-
-        if (stagedFiles.Count > 0)
+        foreach (var queue in Enum.GetValues<Printer.PrinterQueue>())
         {
-            PrinterService.RemoveFromStaged(_state, stagedFiles, printer);
+            string textColor = queue switch
+            {
+                Printer.PrinterQueue.Staged => "[white]",
+                Printer.PrinterQueue.Queued => "[yellow]",
+                Printer.PrinterQueue.Active => "[green]",
+                _ => "[grey]",
+            };
 
-            markups.AddRange([
-                .. stagedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
-            ]);
+            List<LabelFile> files =
+            [
+                .. printer
+                    .QueueSnapshot(queue)
+                    .Where(f => toRemove.Any(s => s.Replace(textColor, "").StartsWith(f.FileName))),
+            ];
+
+            switch (queue)
+            {
+                case Printer.PrinterQueue.Staged:
+                    PrinterService.RemoveFromStaged(_state, files, printer);
+                    markups["success"] =
+                    [
+                        .. files.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
+                    ];
+                    break;
+                case Printer.PrinterQueue.Queued:
+                    PrinterService
+                        .RemoveFromQueue(_state.pathSchema, _state, files, printer)
+                        .Switch(
+                            value =>
+                                markups["success"]
+                                    .AddRange([
+                                        .. files.Select(
+                                            (f, i) => new Markup($"{i + 1}. {f.FileName}")
+                                        ),
+                                    ]),
+                            Messages.Error
+                        );
+                    break;
+                case Printer.PrinterQueue.Active:
+                    markups["failed"] =
+                    [
+                        .. files.Select((f, i) => new Markup($"{1 + 1}. {f.FileName}")),
+                    ];
+                    break;
+            }
         }
 
-        if (queuedFiles.Count > 0)
+        foreach (var (key, value) in markups)
         {
-            PrinterService
-                .RemoveFromQueue(_state.pathSchema, _state, queuedFiles, printer)
-                .Switch(
-                    value =>
-                        markups.AddRange([
-                            .. queuedFiles.Select((f, i) => new Markup($"{i + 1}. {f.FileName}")),
-                        ]),
-                    Messages.Error
-                );
-        }
+            if (key == "success" && value.Count > 0)
+                Panels.MarkupList(value, $"Removed from {printer.Name}", "yellow", Color.Yellow);
 
-        if (markups.Count > 0)
-            Panels.MarkupList(markups, $"Removed from {printer.Name}", "yellow", Color.Yellow);
+            if (key == "failed" && value.Count > 0)
+                Panels.MarkupList(value, $"Can't remove from {printer.Name}", "red", Color.Red);
+        }
     }
 }

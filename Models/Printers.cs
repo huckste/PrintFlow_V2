@@ -21,9 +21,9 @@ public class Printer
 
     public enum PrinterQueue
     {
-        Active,
-        Queued,
         Staged,
+        Queued,
+        Active,
     }
 
     public int TotalLabels
