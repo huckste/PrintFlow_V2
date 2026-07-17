@@ -3,6 +3,7 @@ namespace PrintFlow_V2.Services;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
+using Serilog;
 
 public class LabelFolderWatcher
 {
@@ -36,8 +37,9 @@ public class LabelFolderWatcher
     private void OnFileCreated(object sender, FileSystemEventArgs e)
     {
         string ext = Path.GetExtension(e.FullPath).ToUpper();
-
         string dest = Path.Combine(_pathSchema.LabelDataLoad.Path, Path.GetFileName(e.FullPath));
+
+        Log.Information("File {File} has been created", Path.GetFileName(e.FullPath));
 
         if (ext != ".PKL" && ext != ".SNGL")
             Safely.Copy(e.FullPath, dest).LogOnError();
@@ -45,12 +47,16 @@ public class LabelFolderWatcher
 
     private void OnFileAdded(object sender, FileSystemEventArgs e)
     {
-        LabelFile? label = LabelService.TryBuildLabel(_pathSchema, e.FullPath);
+        var result = Safely
+            .Run(
+                () => LabelService.BuildLabel(e.FullPath, _pathSchema),
+                Err.Action.Read,
+                e.FullPath
+            )
+            .LogOnError();
 
-        if (label == null)
-            return;
-
-        FileCreated?.Invoke(label);
+        if (!result.IsError)
+            FileCreated?.Invoke(result.Value);
     }
 
     private void OnFileRemoved(object sender, FileSystemEventArgs e)

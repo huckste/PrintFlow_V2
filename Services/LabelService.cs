@@ -7,10 +7,8 @@ using PrintFlow_V2.Models;
 
 public class LabelService
 {
-    public static ErrorOr<Success> CopyFiles(PathSchema pathSchema)
+    public static void CopyFiles(PathSchema pathSchema)
     {
-        List<Error> errors = [];
-
         var todaysFiles = Safely
             .Run(
                 () =>
@@ -24,7 +22,7 @@ public class LabelService
                 Err.Action.Read,
                 pathSchema.LabelsDir.Path
             )
-            .CollectTo(errors);
+            .LogOnError();
 
         var now = DateTime.Now;
 
@@ -46,31 +44,25 @@ public class LabelService
                 Err.Action.Read,
                 pathSchema.Archive.Path
             )
-            .CollectTo(errors);
+            .LogOnError();
 
-        if (!todaysFiles.IsError && !archiveFiles.IsError)
+        string[] filesNotPrinted =
+        [
+            .. todaysFiles.Value.Where(f => !archiveFiles.Value.Contains(Path.GetFileName(f))),
+        ];
+
+        foreach (var file in filesNotPrinted)
         {
-            string[] filesNotPrinted =
-            [
-                .. todaysFiles.Value.Where(f => !archiveFiles.Value.Contains(Path.GetFileName(f))),
-            ];
-
-            foreach (var file in filesNotPrinted)
-            {
-                var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
-                Safely.Copy(file, destFile).CollectTo(errors);
-            }
+            var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
+            Safely.Copy(file, destFile).LogOnError();
         }
-
-        return errors.Count > 0 ? errors : Result.Success;
     }
 
     public static ErrorOr<List<LabelFile>> GetLabels(PathSchema pathSchema)
     {
-        List<Error> errors = [];
-        CopyFiles(pathSchema).LogOnError();
+        CopyFiles(pathSchema);
 
-        var result = Safely
+        return Safely
             .Run(
                 () =>
                     Directory
@@ -80,24 +72,19 @@ public class LabelService
                 Err.Action.Read,
                 pathSchema.LabelDataLoad.Path
             )
-            .CollectTo(errors);
-
-        return errors.Count > 0 ? errors : result.Value;
+            .LogOnError();
     }
 
     public static LabelFile BuildLabel(string filePath, PathSchema pathSchema)
     {
-        bool isGtp = Path.GetFileName(filePath).Contains("GTP");
-
         using var reader = new StreamReader(filePath);
 
-        string? firstLine = reader.ReadLine();
-        string? secondLine = reader.ReadLine();
-        string desc = firstLine?.Split('^')[8] ?? string.Empty;
+        bool isGtp = Path.GetFileName(filePath).Contains("GTP");
+        string desc = reader.ReadLine()?.Split('^')[8] ?? string.Empty;
 
         if (isGtp)
         {
-            string? waveNumber = secondLine?.Split('^')[22].Trim();
+            string? waveNumber = reader.ReadLine()?.Split('^')[22].Trim();
 
             if (waveNumber != null)
             {
@@ -108,61 +95,61 @@ public class LabelService
             }
         }
 
-        int lineCount = 0;
+        return new LabelFile(Path.GetFileName(filePath), filePath, desc, GetLineCount(filePath));
+    }
 
-        if (firstLine != null)
-            lineCount++;
+    public static int GetLineCount(string path)
+    {
+        int count = 0;
+        using var stream = File.OpenRead(path);
 
-        if (secondLine != null)
-            lineCount++;
+        Span<byte> buffer = stackalloc byte[4096];
+        int read;
 
-        while (reader.ReadLine() != null)
-            lineCount++;
+        while ((read = stream.Read(buffer)) > 0)
+        {
+            for (int i = 0; i < read; i++)
+            {
+                if (buffer[i] == '\n')
+                    count++;
+            }
+        }
 
-        return new LabelFile(Path.GetFileName(filePath), filePath, desc, lineCount);
+        return count + 1; // last line with no trailling newline
     }
 
     private static string? GetGtpDesc(string waveNumber, PathSchema pathSchema)
     {
-        string? filePath = Directory
-            .GetFiles(pathSchema.LabelDataLoad.Path)
-            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber);
+        var result = Safely
+            .Run(
+                () =>
+                    Directory
+                        .GetFiles(pathSchema.LabelDataLoad.Path)
+                        .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+                Err.Action.Read,
+                pathSchema.LabelDataLoad.Path
+            )
+            .LogOnError();
 
-        filePath ??= Directory
-            .GetFiles(pathSchema.LabelsDir.Path)
-            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber);
-
-        if (filePath != null)
+        if (result.IsError || result.Value is null)
         {
-            using var reader = new StreamReader(filePath);
-            return reader.ReadLine()?.Split('^')[8];
+            result = Safely
+                .Run(
+                    () =>
+                        Directory
+                            .GetFiles(pathSchema.LabelsDir.Path)
+                            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+                    Err.Action.Read,
+                    pathSchema.LabelsDir.Path
+                )
+                .LogOnError();
         }
 
-        return null;
-    }
+        if (result.IsError || result.Value is null)
+            return null;
 
-    // When a file is added to labelDataLoad there can be a race condition between trying to read the file as the file is still being written
-    // Havaing attemprts allows for a retry incase there was a race condition
-    public static LabelFile? TryBuildLabel(
-        PathSchema pathSchema,
-        string filePath,
-        int retries = 5,
-        int delayMs = 200
-    )
-    {
-        for (int i = 0; i < retries; i++)
-        {
-            try
-            {
-                return BuildLabel(filePath, pathSchema);
-            }
-            catch (IOException)
-            {
-                Thread.Sleep(delayMs);
-            }
-        }
-
-        return null;
+        using var reader = new StreamReader(result.Value);
+        return reader.ReadLine()?.Split('^')[8];
     }
 
     public static void ArchiveFile(LabelFile file, PathSchema pathSchema)

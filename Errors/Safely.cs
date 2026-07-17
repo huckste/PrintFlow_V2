@@ -27,7 +27,7 @@ public static class Safely
         FileInfo file = new(sourceFile);
         Error error = new();
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 10; i++)
         {
             try
             {
@@ -38,7 +38,7 @@ public static class Safely
             }
             catch (Exception ex)
             {
-                Thread.Sleep(300);
+                Thread.Sleep(500);
                 error = Err.FailedTo(Err.Action.Copy, sourceFile, ex.Message);
             }
         }

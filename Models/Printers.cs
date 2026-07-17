@@ -1,5 +1,7 @@
 namespace PrintFlow_V2.Models;
 
+using Serilog;
+
 public class Printer
 {
     private readonly Lock _lock = new();
@@ -93,18 +95,13 @@ public class Printer
                 if (label != null)
                 {
                     _queued.RemoveAll(l => l.Id == label.Id);
-                    label.FilePath = e.FullPath;
-                    _active.Add(label);
-                }
+                    Log.Information("Removed from queued: {File}", label.FileName);
 
-                File.AppendAllLines(
-                    @"C:\Temp\watcher.log",
-                    [
-                        $"{DateTime.Now}: Renamed: {e.OldFullPath} -> {e.FullPath}",
-                        $"{DateTime.Now}: Queued: {string.Join(", ", _queued.Select(l =>
-                        l.FilePath))}",
-                    ]
-                );
+                    label.FilePath = e.FullPath;
+
+                    _active.Add(label);
+                    Log.Information("Added to active: {File}", label.FileName);
+                }
             }
         }
     }
@@ -120,6 +117,7 @@ public class Printer
             if (active != null)
             {
                 _active.RemoveAll(l => l.Id == active.Id);
+                Log.Information("File Completed: {FileName}", active.FileName);
 
                 // when file is completed allow external code to react and archive the file
                 FileCompleted?.Invoke(active);
@@ -132,15 +130,6 @@ public class Printer
 
             if (queued != null)
                 _queued.RemoveAll(qf => qf.Id == queued.Id);
-
-            File.AppendAllLines(
-                @"C:\Temp\watcher.log",
-                [
-                    $"{DateTime.Now}: Deleted: {e.FullPath}",
-                    $"{DateTime.Now}: Active: {string.Join(", ", _active.Select(l =>
-                    l.FilePath))}",
-                ]
-            );
         }
     }
 
@@ -150,6 +139,9 @@ public class Printer
         {
             List<LabelFile> target = GetTargetQueue(queue);
             target.AddRange(files.Where(f => !target.Any(tf => tf.Id == f.Id)));
+
+            foreach (var file in files)
+                Log.Information("File {File} added to {Queue}", file.FileName, queue);
         }
     }
 
@@ -161,6 +153,10 @@ public class Printer
             List<LabelFile> removed = [.. target.Where(tf => files.Any(f => f.Id == tf.Id))];
 
             target.RemoveAll(tf => files.Any(f => f.Id == tf.Id));
+
+            foreach (var file in files)
+                Log.Information("File {File} removed from {Queue}", file.FileName, queue);
+
             return removed;
         }
     }
@@ -168,7 +164,10 @@ public class Printer
     public void ClearQueue(PrinterQueue queue)
     {
         lock (_lock)
+        {
             GetTargetQueue(queue).Clear();
+            Log.Information("Queue {Queue} has been cleared", queue);
+        }
     }
 
     public void MoveQueue(PrinterQueue fromQueue, PrinterQueue toQueue, List<LabelFile> files)
@@ -182,6 +181,14 @@ public class Printer
 
             toTarget.AddRange(toMove.Where(f => !toTarget.Any(t => t.Id == f.Id)));
             fromTarget.RemoveAll(tf => toMove.Any(f => f.Id == tf.Id));
+
+            foreach (var file in files)
+                Log.Information(
+                    "File {File} removed from {FromQueue} and added to {ToQueue}",
+                    file.FileName,
+                    fromQueue,
+                    toQueue
+                );
         }
     }
 
@@ -199,6 +206,13 @@ public class Printer
             {
                 toTarget.Add(toMove);
                 fromTarget.Remove(toMove);
+
+                Log.Information(
+                    "File {File} removed from {FromQueue} and added to {ToQueue}",
+                    file.FileName,
+                    fromQueue,
+                    toQueue
+                );
             }
         }
     }
@@ -208,7 +222,17 @@ public class Printer
         lock (_lock)
         {
             LabelFile? labelFile = GetTargetQueue(queue).FirstOrDefault(f => f.Id == file.Id);
+            string? currentPath = labelFile?.FilePath;
+
             labelFile?.FilePath = newPath;
+
+            Log.Information(
+                "File {File} in {Queue} has changed path from {CurrentPath} to {NewPath}",
+                file.FileName,
+                queue,
+                currentPath,
+                newPath
+            );
         }
     }
 

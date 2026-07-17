@@ -25,29 +25,33 @@ public static class ConfigManager
         Save(PathSchema.Production()).Then(r => Result.Success);
 
     public static ErrorOr<PathSchema> Load() =>
-        Safely.Run(
-            () =>
-            {
-                string json = File.ReadAllText(_configFilePath);
-                var schema = JsonSerializer.Deserialize<PathSchema>(json, JsonOptions);
-                return schema ?? throw new InvalidOperationException("Deserialized to null");
-            },
-            Err.Action.Read,
-            _configFilePath
-        );
+        Safely
+            .Run(
+                () =>
+                {
+                    string json = File.ReadAllText(_configFilePath);
+                    var schema = JsonSerializer.Deserialize<PathSchema>(json, JsonOptions);
+                    return schema ?? throw new InvalidOperationException("Deserialized to null");
+                },
+                Err.Action.Read,
+                _configFilePath
+            )
+            .LogOnError();
 
     public static ErrorOr<Success> Save(PathSchema settings)
     {
-        return Safely.Run(
-            () =>
-            {
-                string json = JsonSerializer.Serialize(settings, JsonOptions);
-                File.WriteAllText(_configFilePath, json);
-            },
-            Err.Action.Write,
-            _configFilePath,
-            "Unable to write to file"
-        );
+        return Safely
+            .Run(
+                () =>
+                {
+                    string json = JsonSerializer.Serialize(settings, JsonOptions);
+                    File.WriteAllText(_configFilePath, json);
+                },
+                Err.Action.Write,
+                _configFilePath,
+                "Unable to write to file"
+            )
+            .LogOnError();
     }
 
     public static ErrorOr<Success> ValidatePaths(PathSchema pathSchema)
@@ -69,6 +73,8 @@ public static class ConfigManager
                 errors.Add(Err.NotFound(Err.NotFoundType.Directory, path));
         }
 
+        errors.LogToFile();
+
         return errors.Count > 0 ? errors : Result.Success;
     }
 
@@ -76,15 +82,20 @@ public static class ConfigManager
     {
         List<Error> errors = [];
 
-        var paths = pathSchema.GetAllPaths().CollectTo(errors);
+        foreach (string path in pathSchema.GetStructuralPaths())
+            Safely
+                .Run(() => Directory.CreateDirectory(path), Err.Action.Create, path)
+                .CollectTo(errors);
 
-        if (!paths.IsError)
-        {
-            foreach (string path in paths.Value)
+        var printerPaths = pathSchema.GetPrinterPaths().CollectTo(errors);
+
+        if (!printerPaths.IsError)
+            foreach (string path in printerPaths.Value)
                 Safely
                     .Run(() => Directory.CreateDirectory(path), Err.Action.Create, path)
                     .CollectTo(errors);
-        }
+
+        errors.LogToFile();
 
         return errors.Count > 0 ? errors : Result.Success;
     }

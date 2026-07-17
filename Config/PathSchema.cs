@@ -89,6 +89,8 @@ public class PathSchema
             .Run(() => Directory.GetDirectories(popsPath), Err.Action.Read, popsPath)
             .CollectTo(errors);
 
+        errors.LogToFile();
+
         if (errors.Count <= 0)
         {
             foreach (string copPath in copResult.Value)
@@ -113,7 +115,9 @@ public class PathSchema
         Dictionary<string, string> printerPaths = [];
         string pklPath = Path.Combine(BarprnDir.Path, "packing-lists");
 
-        var result = Safely.Run(() => Directory.GetDirectories(pklPath), Err.Action.Read, pklPath);
+        var result = Safely
+            .Run(() => Directory.GetDirectories(pklPath), Err.Action.Read, pklPath)
+            .LogOnError();
 
         if (!result.IsError)
         {
@@ -142,6 +146,14 @@ public class PathSchema
     public Dictionary<string, PathDesc> ToDict() =>
         ToList().ToDictionary(desc => desc.Name, desc => desc);
 
+    public List<string> GetStructuralPaths() =>
+        [
+            .. ToList().Select(d => d.Path),
+            Path.Combine(BarprnDir.Path, "cops"),
+            Path.Combine(BarprnDir.Path, "pops"),
+            Path.Combine(BarprnDir.Path, "packing-lists"),
+        ];
+
     public ErrorOr<List<string>> GetAllPaths()
     {
         List<string> allPaths = [];
@@ -154,17 +166,20 @@ public class PathSchema
         if (!printerPaths.IsError)
             allPaths.AddRange(printerPaths.Value);
 
+        errors.LogToFile();
+
         return errors.Count > 0 ? errors : allPaths;
     }
 
+    public string GetTempPath() =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Temp");
+
     public void Defaults(bool isTest)
     {
-        string testBaseDir = @"C:\Temp";
-
         foreach (var desc in ToList())
         {
             var relative = isTest ? desc.TestRelative : desc.ProdRelative;
-            desc.Path = !isTest ? relative : Path.Combine(testBaseDir, relative);
+            desc.Path = !isTest ? relative : Path.Combine(GetTempPath(), relative);
         }
     }
 
