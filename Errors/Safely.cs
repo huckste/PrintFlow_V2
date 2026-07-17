@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using ErrorOr;
+using Serilog;
 
 namespace PrintFlow_V2.Errors;
 
@@ -27,7 +28,7 @@ public static class Safely
         FileInfo file = new(sourceFile);
         Error error = new();
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 5; i++)
         {
             try
             {
@@ -40,6 +41,13 @@ public static class Safely
             {
                 Thread.Sleep(500);
                 error = Err.FailedTo(Err.Action.Copy, sourceFile, ex.Message);
+
+                Log.Error(
+                    "Failed to copy File {File} from {FromDirectory} to {ToDirectory}",
+                    sourceFile,
+                    Path.GetDirectoryName(sourceFile),
+                    Path.GetDirectoryName(dest)
+                );
             }
         }
 

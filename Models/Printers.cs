@@ -5,16 +5,19 @@ using Serilog;
 public class Printer
 {
     private readonly Lock _lock = new();
-    private readonly FileSystemWatcher _popWatcher;
-    private readonly FileSystemWatcher _copWatcher;
+
+    private readonly FileSystemWatcher? _popWatcher;
+    private readonly FileSystemWatcher? _copWatcher;
+    private readonly FileSystemWatcher? _pklWatcher;
 
     private readonly List<LabelFile> _queued = [];
     private readonly List<LabelFile> _staged = [];
     private readonly List<LabelFile> _active = [];
 
     public string Name { get; }
-    public string PopPath { get; }
-    public string CopPath { get; }
+    public string? PopPath { get; }
+    public string? CopPath { get; }
+    public string? PklPath { get; }
     public int MaxLen { get; }
 
     public event Action<LabelFile>? FileCompleted;
@@ -26,6 +29,13 @@ public class Printer
         Staged,
         Queued,
         Active,
+    }
+
+    public enum PrinterType
+    {
+        COP,
+        POP,
+        PKL,
     }
 
     public int TotalLabels
@@ -43,32 +53,45 @@ public class Printer
 
     public string PadName => Name.PadRight(MaxLen);
 
-    public Printer(string name, string copPath, string popPath, int maxLen)
+    public Printer(string name, Dictionary<PrinterType, string> printerPaths, int maxLen)
     {
         Name = name;
-        CopPath = copPath;
-        PopPath = popPath;
         MaxLen = maxLen;
 
-        _copWatcher = new FileSystemWatcher(copPath)
+        foreach (var (key, value) in printerPaths)
+        {
+            switch (key)
+            {
+                case PrinterType.COP:
+                    CopPath = value;
+                    SetupWatcher(ref _copWatcher, CopPath);
+
+                    break;
+                case PrinterType.POP:
+                    PopPath = value;
+                    SetupWatcher(ref _popWatcher, PopPath);
+
+                    break;
+                case PrinterType.PKL:
+                    PklPath = value;
+                    SetupWatcher(ref _pklWatcher, PklPath);
+
+                    break;
+            }
+        }
+    }
+
+    private void SetupWatcher(ref FileSystemWatcher? fsw, string path)
+    {
+        fsw = new FileSystemWatcher(path)
         {
             EnableRaisingEvents = true,
             InternalBufferSize = 65536,
             NotifyFilter = NotifyFilters.FileName,
         };
 
-        _popWatcher = new FileSystemWatcher(popPath)
-        {
-            EnableRaisingEvents = true,
-            InternalBufferSize = 65536,
-            NotifyFilter = NotifyFilters.FileName,
-        };
-
-        _copWatcher.Deleted += OnFileDeleted;
-        _popWatcher.Deleted += OnFileDeleted;
-
-        _copWatcher.Renamed += OnFileRenamed;
-        _popWatcher.Renamed += OnFileRenamed;
+        fsw.Deleted += OnFileDeleted;
+        fsw.Renamed += OnFileRenamed;
     }
 
     private List<LabelFile> GetTargetQueue(PrinterQueue queue) =>
@@ -245,12 +268,32 @@ public class Printer
         }
     }
 
+    public int? GetAllQueueCount()
+    {
+        int total = 0;
+
+        foreach (var queue in Enum.GetValues<PrinterQueue>())
+            total += GetQueueCount(queue);
+
+        return total == 0 ? null : total;
+    }
+
+    public int GetMaxFileNameAllQueues()
+    {
+        int total = 0;
+
+        foreach (var queue in Enum.GetValues<PrinterQueue>())
+            total += MaxFileNameLength(queue);
+
+        return total;
+    }
+
     public int MaxFileNameLength(PrinterQueue queue)
     {
         lock (_lock)
         {
             List<LabelFile> target = GetTargetQueue(queue);
-            return target.Max(f => f.FileName.Length);
+            return target.Count > 0 ? target.Max(f => f.FileName.Length) : 0;
         }
     }
 

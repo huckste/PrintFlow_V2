@@ -47,20 +47,39 @@ public class LabelFolderWatcher
 
     private void OnFileAdded(object sender, FileSystemEventArgs e)
     {
-        var result = Safely
-            .Run(
-                () => LabelService.BuildLabel(e.FullPath, _pathSchema),
-                Err.Action.Read,
-                e.FullPath
-            )
-            .LogOnError();
+        for (int i = 0; i < 5; i++)
+        {
+            var result = Safely
+                .Run(
+                    () => LabelService.BuildLabel(e.FullPath, _pathSchema),
+                    Err.Action.Read,
+                    e.FullPath
+                )
+                .LogOnError();
 
-        if (!result.IsError)
-            FileCreated?.Invoke(result.Value);
+            if (!result.IsError)
+            {
+                FileCreated?.Invoke(result.Value);
+                Log.Information(
+                    "File {File} has been added from {Directory}",
+                    Path.GetFileName(e.FullPath),
+                    Path.GetDirectoryName(e.FullPath)
+                );
+                break;
+            }
+
+            Thread.Sleep(300);
+        }
     }
 
     private void OnFileRemoved(object sender, FileSystemEventArgs e)
     {
         FileDeleted?.Invoke(e.FullPath);
+
+        Log.Information(
+            "File {File} has been removed from {Directory}",
+            Path.GetFileName(e.FullPath),
+            Path.GetDirectoryName(e.FullPath)
+        );
     }
 }

@@ -17,7 +17,7 @@ try
 {
     await PrintFlowApp.Run();
 }
-catch
+finally
 {
     await Log.CloseAndFlushAsync();
 }

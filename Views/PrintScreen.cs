@@ -167,20 +167,35 @@ public class PrintScreen(PrintState state)
             foreach (var printer in printers)
             {
                 var result = PrinterService.SendStagedFiles(printer).LogOnError();
-                List<Markup> markups = [];
+                Dictionary<string, List<Markup>> markups = [];
 
                 if (!result.IsError)
                 {
                     int i = 1;
+                    markups.TryAdd("success", []);
 
                     foreach (LabelFile file in result.Value)
-                    {
-                        markups.Add(new Markup($"{i++}. {file.FileName}"));
-                    }
-                }
+                        markups["success"].Add(new Markup($"{i++}. {file.FileName}"));
 
-                if (markups.Count > 0)
-                    Panels.MarkupList(markups, $"Sent to {printer.Name}", "green", Color.Green);
+                    if (markups["success"].Count > 0)
+                        Panels.MarkupList(
+                            markups["success"],
+                            $"Sent to {printer.Name}",
+                            "green",
+                            Color.Green
+                        );
+                }
+                else
+                {
+                    int i = 1;
+                    markups.TryAdd("failed", []);
+
+                    foreach (var error in result.Errors)
+                        markups["failed"].Add(new Markup($"{i++}. {error.Description}"));
+
+                    if (markups["failed"].Count > 0)
+                        Panels.MarkupList(markups["failed"], "Error", "red", Color.Red);
+                }
             }
         }
         else
@@ -205,29 +220,14 @@ public class PrintScreen(PrintState state)
 
         var printer = _state.Printers.First(p => printerChoice.StartsWith(p.PadName));
 
-        if (
-            printer.GetQueueCount(Printer.PrinterQueue.Staged) == 0
-            && printer.GetQueueCount(Printer.PrinterQueue.Queued) == 0
-            && printer.GetQueueCount(Printer.PrinterQueue.Active) == 0
-        )
+        if (printer.GetAllQueueCount() is null)
         {
             Messages.Warning($"{printer.Name} queue is empty");
             return;
         }
 
-        int maxLen = 0;
-        List<int> lenList = [];
+        int maxLen = printer.GetMaxFileNameAllQueues();
 
-        if (printer.GetQueueCount(Printer.PrinterQueue.Staged) > 0)
-            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Staged));
-
-        if (printer.GetQueueCount(Printer.PrinterQueue.Queued) > 0)
-            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Queued));
-
-        if (printer.GetQueueCount(Printer.PrinterQueue.Active) > 0)
-            lenList.Add(printer.MaxFileNameLength(Printer.PrinterQueue.Active));
-
-        maxLen = lenList.Max();
         List<string> allFiles = [];
 
         foreach (var queue in Enum.GetValues<Printer.PrinterQueue>())

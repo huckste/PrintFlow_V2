@@ -51,83 +51,40 @@ public class PathSchema
             TestRelative = "logs",
         };
 
-    public ErrorOr<List<string>> GetPrinterPaths()
+    public ErrorOr<List<string>> GetPrinterPaths() =>
+        PrintersDict().Then(v => v.SelectMany(outer => outer.Value.Values).ToList());
+
+    public ErrorOr<Dictionary<string, Dictionary<Printer.PrinterType, string>>> PrintersDict()
     {
-        List<string> printerPaths = [];
         List<Error> errors = [];
+        Dictionary<string, Dictionary<Printer.PrinterType, string>> printerPaths = [];
 
-        var labelPrinters = LabelPrintersDict().CollectTo(errors);
-        var packingListPrinters = PackingListPrintersDict().CollectTo(errors);
-
-        if (!packingListPrinters.IsError && !labelPrinters.IsError)
+        Dictionary<Printer.PrinterType, string> printerParentDirs = new()
         {
-            foreach (KeyValuePair<string, string[]> kvp in labelPrinters.Value)
-                printerPaths.AddRange(kvp.Value);
+            [Printer.PrinterType.COP] = Path.Combine(BarprnDir.Path, "cops"),
+            [Printer.PrinterType.POP] = Path.Combine(BarprnDir.Path, "pops"),
+            [Printer.PrinterType.PKL] = Path.Combine(BarprnDir.Path, "packing-lists"),
+        };
 
-            foreach (KeyValuePair<string, string> kvp in packingListPrinters.Value)
-                printerPaths.Add(kvp.Value);
-
-            return printerPaths;
-        }
-
-        return errors;
-    }
-
-    public ErrorOr<Dictionary<string, string[]>> LabelPrintersDict()
-    {
-        Dictionary<string, string[]> printerPaths = [];
-        List<Error> errors = [];
-
-        string copsPath = Path.Combine(BarprnDir.Path, "cops");
-        string popsPath = Path.Combine(BarprnDir.Path, "pops");
-
-        var copResult = Safely
-            .Run(() => Directory.GetDirectories(copsPath), Err.Action.Read, copsPath)
-            .CollectTo(errors);
-
-        var popResult = Safely
-            .Run(() => Directory.GetDirectories(popsPath), Err.Action.Read, popsPath)
-            .CollectTo(errors);
-
-        errors.LogToFile();
-
-        if (errors.Count <= 0)
+        foreach (var (type, path) in printerParentDirs)
         {
-            foreach (string copPath in copResult.Value)
+            var result = Safely
+                .Run(() => Directory.GetDirectories(path), Err.Action.Read, path)
+                .CollectTo(errors);
+
+            if (result.IsError)
+                continue;
+
+            foreach (var printerPath in result.Value)
             {
-                string printerName = Path.GetFileName(copPath).Split('-')[^1];
+                string printerName = Path.GetFileName(printerPath).Split('-')[^1];
 
-                string popPath = popResult.Value.Single(p =>
-                    Path.GetFileName(p).Split('-')[^1] == printerName
-                );
-
-                printerPaths.Add(printerName, [copPath, popPath]);
+                if (!printerPaths.TryAdd(printerName, new() { [type] = printerPath }))
+                    printerPaths[printerName].TryAdd(type, printerPath);
             }
-
-            return printerPaths;
         }
 
-        return errors;
-    }
-
-    public ErrorOr<Dictionary<string, string>> PackingListPrintersDict()
-    {
-        Dictionary<string, string> printerPaths = [];
-        string pklPath = Path.Combine(BarprnDir.Path, "packing-lists");
-
-        var result = Safely
-            .Run(() => Directory.GetDirectories(pklPath), Err.Action.Read, pklPath)
-            .LogOnError();
-
-        if (!result.IsError)
-        {
-            foreach (string path in result.Value)
-                printerPaths.Add(Path.GetFileName(path), path);
-
-            return printerPaths;
-        }
-
-        return result.Errors;
+        return errors.Count > 0 ? errors : printerPaths;
     }
 
     public List<PathDesc> ToList()
@@ -171,7 +128,7 @@ public class PathSchema
         return errors.Count > 0 ? errors : allPaths;
     }
 
-    public string GetTempPath() =>
+    public static string GetTempPath() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Temp");
 
     public void Defaults(bool isTest)

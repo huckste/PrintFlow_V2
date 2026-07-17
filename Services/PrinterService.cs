@@ -9,21 +9,22 @@ public class PrinterService()
 {
     public static ErrorOr<List<Printer>> GetPrinters(PathSchema pathSchema)
     {
-        var printers = pathSchema.LabelPrintersDict();
+        List<Printer> allPrinters = [];
+        var printers = pathSchema.PrintersDict();
 
-        if (!printers.IsError)
-        {
-            int maxLen = printers.Value.Max(name => name.Key.Length);
+        if (printers.IsError)
+            return printers.Errors;
 
-            return printers
-                .Value.Select(
-                    // kvp.Value[0] is the cop path and kvp.Value[1] is the pop path
-                    (kvp, i) => new Printer(kvp.Key, kvp.Value[0], kvp.Value[1], maxLen)
-                )
-                .ToList();
-        }
+        int maxLen = printers.Value.Max(name => name.Key.Length);
 
-        return printers.Errors;
+        return printers
+            .Value.Select(
+                (kvp, i) =>
+                {
+                    return new Printer(kvp.Key, kvp.Value, maxLen);
+                }
+            )
+            .ToList();
     }
 
     public static ErrorOr<Success> RemoveFromQueue(
@@ -73,7 +74,7 @@ public class PrinterService()
         string[] fbcopExt = [".FBCOP", ".COP", ".FOP", ".BOP"];
         string[] popExt = [".POP", ".PCT"];
 
-        string printerPath = "";
+        string? printerPath = null;
         List<Error> errors = [];
 
         IReadOnlyList<LabelFile> staged = printer.QueueSnapshot(Printer.PrinterQueue.Staged);
@@ -92,7 +93,7 @@ public class PrinterService()
                     _ => $"{file.FilePath}.FBCOP",
                 };
 
-                printerPath = printer.CopPath;
+                printerPath ??= printer.CopPath;
             }
             else if (popExt.Contains(ext))
             {
@@ -104,6 +105,14 @@ public class PrinterService()
 
                 printerPath = printer.PopPath;
             }
+            else if (ext == ".PKL")
+            {
+                destFileName = file.FilePath;
+                printerPath = printer.PklPath;
+            }
+
+            if (printerPath is null)
+                return errors;
 
             string dest = Path.Combine(printerPath, Path.GetFileName(destFileName));
             string fromPath = file.FilePath;

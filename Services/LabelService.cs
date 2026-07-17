@@ -9,42 +9,38 @@ public class LabelService
 {
     public static void CopyFiles(PathSchema pathSchema)
     {
-        var todaysFiles = Safely
-            .Run(
-                () =>
-                {
-                    return Directory
-                        .GetFiles(pathSchema.LabelsDir.Path)
-                        .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
-                        .Where(f => !Path.GetExtension(f).Equals(".SNGL"))
-                        .ToList();
-                },
-                Err.Action.Read,
-                pathSchema.LabelsDir.Path
-            )
-            .LogOnError();
+        var todaysFiles = Safely.Run(
+            () =>
+            {
+                return Directory
+                    .GetFiles(pathSchema.LabelsDir.Path)
+                    .Where(f => File.GetCreationTime(f).Date == DateTime.Today)
+                    .Where(f => !Path.GetExtension(f).Equals(".SNGL"))
+                    .ToList();
+            },
+            Err.Action.Read,
+            pathSchema.LabelsDir.Path
+        );
 
         var now = DateTime.Now;
 
-        var archiveFiles = Safely
-            .Run(
-                () =>
-                {
-                    return Directory
-                        .GetFiles(pathSchema.Archive.Path)
-                        .Where(f =>
-                        {
-                            var info = new FileInfo(f);
-                            return info.LastWriteTime.Month == now.Month
-                                && info.LastWriteTime.Year == now.Year;
-                        })
-                        .Select(f => Path.GetFileName(f))
-                        .ToList();
-                },
-                Err.Action.Read,
-                pathSchema.Archive.Path
-            )
-            .LogOnError();
+        var archiveFiles = Safely.Run(
+            () =>
+            {
+                return Directory
+                    .GetFiles(pathSchema.Archive.Path)
+                    .Where(f =>
+                    {
+                        var info = new FileInfo(f);
+                        return info.LastWriteTime.Month == now.Month
+                            && info.LastWriteTime.Year == now.Year;
+                    })
+                    .Select(f => Path.GetFileName(f))
+                    .ToList();
+            },
+            Err.Action.Read,
+            pathSchema.Archive.Path
+        );
 
         string[] filesNotPrinted =
         [
@@ -54,7 +50,7 @@ public class LabelService
         foreach (var file in filesNotPrinted)
         {
             var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
-            Safely.Copy(file, destFile).LogOnError();
+            Safely.Copy(file, destFile);
         }
     }
 
@@ -62,17 +58,15 @@ public class LabelService
     {
         CopyFiles(pathSchema);
 
-        return Safely
-            .Run(
-                () =>
-                    Directory
-                        .GetFiles(pathSchema.LabelDataLoad.Path)
-                        .Select(fp => BuildLabel(fp, pathSchema))
-                        .ToList(),
-                Err.Action.Read,
-                pathSchema.LabelDataLoad.Path
-            )
-            .LogOnError();
+        return Safely.Run(
+            () =>
+                Directory
+                    .GetFiles(pathSchema.LabelDataLoad.Path)
+                    .Select(fp => BuildLabel(fp, pathSchema))
+                    .ToList(),
+            Err.Action.Read,
+            pathSchema.LabelDataLoad.Path
+        );
     }
 
     public static LabelFile BuildLabel(string filePath, PathSchema pathSchema)
@@ -120,29 +114,25 @@ public class LabelService
 
     private static string? GetGtpDesc(string waveNumber, PathSchema pathSchema)
     {
-        var result = Safely
-            .Run(
-                () =>
-                    Directory
-                        .GetFiles(pathSchema.LabelDataLoad.Path)
-                        .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
-                Err.Action.Read,
-                pathSchema.LabelDataLoad.Path
-            )
-            .LogOnError();
+        var result = Safely.Run(
+            () =>
+                Directory
+                    .GetFiles(pathSchema.LabelDataLoad.Path)
+                    .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+            Err.Action.Read,
+            pathSchema.LabelDataLoad.Path
+        );
 
         if (result.IsError || result.Value is null)
         {
-            result = Safely
-                .Run(
-                    () =>
-                        Directory
-                            .GetFiles(pathSchema.LabelsDir.Path)
-                            .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
-                    Err.Action.Read,
-                    pathSchema.LabelsDir.Path
-                )
-                .LogOnError();
+            result = Safely.Run(
+                () =>
+                    Directory
+                        .GetFiles(pathSchema.LabelsDir.Path)
+                        .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+                Err.Action.Read,
+                pathSchema.LabelsDir.Path
+            );
         }
 
         if (result.IsError || result.Value is null)
@@ -164,8 +154,6 @@ public class LabelService
             Path.GetFileName(file.OriginalFilePath)
         );
 
-        Safely
-            .Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest)
-            .LogOnError();
+        Safely.Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest);
     }
 }
