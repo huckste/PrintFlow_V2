@@ -93,7 +93,7 @@ public class PrinterService()
                     _ => $"{file.FilePath}.FBCOP",
                 };
 
-                printerPath ??= printer.CopPath;
+                printerPath = printer.CopPath;
             }
             else if (popExt.Contains(ext))
             {
@@ -111,27 +111,41 @@ public class PrinterService()
                 printerPath = printer.PklPath;
             }
 
-            if (printerPath is null)
-                return errors;
-
-            string dest = Path.Combine(printerPath, Path.GetFileName(destFileName));
-            string fromPath = file.FilePath;
-
-            printer.UpdateFilePath(file, dest, Printer.PrinterQueue.Staged);
-            printer.MoveQueue(Printer.PrinterQueue.Staged, Printer.PrinterQueue.Queued, file);
-
-            var moveResult = Safely
-                .Run(() => File.Move(fromPath, dest), Err.Action.Move, fromPath)
-                .CollectTo(errors);
-
-            if (moveResult.IsError)
+            if (printerPath is not null)
             {
-                printer.UpdateFilePath(file, fromPath, Printer.PrinterQueue.Queued);
-                printer.MoveQueue(Printer.PrinterQueue.Queued, Printer.PrinterQueue.Staged, file);
+                string dest = Path.Combine(printerPath, Path.GetFileName(destFileName));
+                string fromPath = file.FilePath;
+
+                printer.UpdateFilePath(file, dest, Printer.PrinterQueue.Staged);
+                printer.MoveQueue(Printer.PrinterQueue.Staged, Printer.PrinterQueue.Queued, file);
+
+                var moveResult = Safely
+                    .Run(() => File.Move(fromPath, dest), Err.Action.Move, fromPath)
+                    .CollectTo(errors);
+
+                if (moveResult.IsError)
+                {
+                    printer.UpdateFilePath(file, fromPath, Printer.PrinterQueue.Queued);
+                    printer.MoveQueue(
+                        Printer.PrinterQueue.Queued,
+                        Printer.PrinterQueue.Staged,
+                        file
+                    );
+                }
+                else
+                {
+                    queuedFiles.Add(file);
+                }
             }
             else
             {
-                queuedFiles.Add(file);
+                errors.Add(
+                    Err.FailedTo(
+                        Err.Action.Move,
+                        $"{printer.Name} staged files to printer queue",
+                        $"Printer path for file type '{ext}' is null"
+                    )
+                );
             }
         }
 

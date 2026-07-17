@@ -71,22 +71,28 @@ public class LabelService
 
     public static LabelFile BuildLabel(string filePath, PathSchema pathSchema)
     {
-        using var reader = new StreamReader(filePath);
-
         bool isGtp = Path.GetFileName(filePath).Contains("GTP");
-        string desc = reader.ReadLine()?.Split('^')[8] ?? string.Empty;
+        bool isPkl = Path.GetExtension(filePath) == ".PKL";
+
+        string? waveNumber = null;
+
+        using var reader = new StreamReader(filePath);
+        string firstLine = reader.ReadLine() ?? string.Empty;
+
+        string desc = firstLine.Split('^')[8];
 
         if (isGtp)
+            waveNumber = reader.ReadLine()?.Split('^')[22].Trim();
+
+        if (isPkl)
+            waveNumber = firstLine.Split('^')[5];
+
+        if (waveNumber != null)
         {
-            string? waveNumber = reader.ReadLine()?.Split('^')[22].Trim();
+            string? newDesc = GetLabelDescByWave(waveNumber, pathSchema);
 
-            if (waveNumber != null)
-            {
-                string? newDesc = GetGtpDesc(waveNumber, pathSchema);
-
-                if (newDesc != null)
-                    desc = newDesc;
-            }
+            if (newDesc != null)
+                desc = newDesc;
         }
 
         return new LabelFile(Path.GetFileName(filePath), filePath, desc, GetLineCount(filePath));
@@ -112,7 +118,7 @@ public class LabelService
         return count + 1; // last line with no trailling newline
     }
 
-    private static string? GetGtpDesc(string waveNumber, PathSchema pathSchema)
+    private static string? GetLabelDescByWave(string waveNumber, PathSchema pathSchema)
     {
         var result = Safely.Run(
             () =>
