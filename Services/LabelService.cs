@@ -4,6 +4,7 @@ using ErrorOr;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
+using Serilog;
 
 public class LabelService
 {
@@ -75,6 +76,7 @@ public class LabelService
         bool isPkl = Path.GetExtension(filePath) == ".PKL";
 
         string? waveNumber = null;
+        List<string> waveNumbers = [];
 
         using var reader = new StreamReader(filePath);
         string firstLine = reader.ReadLine() ?? string.Empty;
@@ -82,7 +84,45 @@ public class LabelService
         string desc = firstLine.Split('^')[8];
 
         if (isGtp)
+        {
             waveNumber = reader.ReadLine()?.Split('^')[22].Trim();
+
+            while (true)
+            {
+                string? nextWaveNumber = reader.ReadLine()?.Split('^')[22].Trim();
+
+                if (nextWaveNumber is null)
+                    break;
+
+                if (!waveNumbers.Contains(nextWaveNumber) && !string.IsNullOrEmpty(nextWaveNumber))
+                    waveNumbers.Add(nextWaveNumber);
+            }
+
+            if (waveNumbers.Count > 1)
+            {
+                desc = "";
+                int originalLen = 0;
+
+                foreach (var wave in waveNumbers)
+                {
+                    if (string.IsNullOrWhiteSpace(desc))
+                    {
+                        desc = GetLabelDescByWave(wave, pathSchema) ?? "";
+                        originalLen = desc.Length;
+                        desc = desc.Trim();
+                    }
+                    else
+                    {
+                        desc += $",{GetLabelDescByWave(wave, pathSchema)?[6..].Trim()}";
+                    }
+                }
+
+                if (desc.Length < originalLen)
+                    desc = desc.PadRight(originalLen);
+
+                waveNumber = null;
+            }
+        }
 
         if (isPkl)
             waveNumber = firstLine.Split('^')[5];

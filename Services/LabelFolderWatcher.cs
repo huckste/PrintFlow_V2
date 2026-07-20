@@ -41,7 +41,7 @@ public class LabelFolderWatcher
 
         Log.Information("File {File} has been created", Path.GetFileName(e.FullPath));
 
-        if (ext != ".PKL" && ext != ".SNGL")
+        if (ext != ".SNGL")
             Safely.Copy(e.FullPath, dest).LogOnError();
     }
 
