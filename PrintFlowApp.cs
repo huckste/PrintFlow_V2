@@ -14,7 +14,7 @@ public class PrintFlowApp
 
     public static async Task Run()
     {
-        var ensured = EnsureConfig();
+        var ensured = EnsureConfig().LogOnError();
 
         if (ensured.IsError)
             return;

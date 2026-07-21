@@ -4,7 +4,6 @@ using ErrorOr;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
-using Serilog;
 
 public class LabelService
 {
@@ -51,7 +50,7 @@ public class LabelService
         foreach (var file in filesNotPrinted)
         {
             var destFile = Path.Combine(pathSchema.LabelDataLoad.Path, Path.GetFileName(file));
-            Safely.Copy(file, destFile);
+            Safely.Copy(file, destFile).LogOnError();
         }
     }
 

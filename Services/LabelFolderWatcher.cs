@@ -1,5 +1,6 @@
 namespace PrintFlow_V2.Services;
 
+using ErrorOr;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
@@ -47,15 +48,15 @@ public class LabelFolderWatcher
 
     private void OnFileAdded(object sender, FileSystemEventArgs e)
     {
+        ErrorOr<LabelFile> result = Err.FailedTo(Err.Action.Read, e.FullPath);
+
         for (int i = 0; i < 5; i++)
         {
-            var result = Safely
-                .Run(
-                    () => LabelService.BuildLabel(e.FullPath, _pathSchema),
-                    Err.Action.Read,
-                    e.FullPath
-                )
-                .LogOnError();
+            result = Safely.Run(
+                () => LabelService.BuildLabel(e.FullPath, _pathSchema),
+                Err.Action.Read,
+                e.FullPath
+            );
 
             if (!result.IsError)
             {
@@ -65,11 +66,13 @@ public class LabelFolderWatcher
                     Path.GetFileName(e.FullPath),
                     Path.GetDirectoryName(e.FullPath)
                 );
-                break;
+                return;
             }
 
             Thread.Sleep(300);
         }
+
+        result.LogOnError();
     }
 
     private void OnFileRemoved(object sender, FileSystemEventArgs e)

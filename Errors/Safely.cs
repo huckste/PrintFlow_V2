@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using ErrorOr;
-using Serilog;
 
 namespace PrintFlow_V2.Errors;
 
@@ -33,21 +32,37 @@ public static class Safely
             try
             {
                 using (file.Open(FileMode.Open, FileAccess.Read, FileShare.None)) { }
+                long fileSize = file.Length;
 
-                File.Copy(sourceFile, dest, overwrite: true);
-                return Result.Success;
+                while (true)
+                {
+                    Thread.Sleep(500);
+
+                    file.Refresh();
+
+                    if (fileSize == file.Length)
+                    {
+                        File.Copy(sourceFile, dest, overwrite: true);
+                        return Result.Success;
+                    }
+                    else if (fileSize < file.Length)
+                    {
+                        fileSize = file.Length;
+                    }
+                    else
+                    {
+                        return Err.FailedTo(
+                            Err.Action.Copy,
+                            sourceFile,
+                            "File size decreased during write"
+                        );
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Thread.Sleep(500);
                 error = Err.FailedTo(Err.Action.Copy, sourceFile, ex.Message);
-
-                Log.Error(
-                    "Failed to copy File {File} from {FromDirectory} to {ToDirectory}",
-                    sourceFile,
-                    Path.GetDirectoryName(sourceFile),
-                    Path.GetDirectoryName(dest)
-                );
             }
         }
 
