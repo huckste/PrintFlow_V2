@@ -38,10 +38,8 @@ public static class MainMenu
                 "Reprint",
                 () =>
                 {
-                    AnsiConsole.Clear();
-                    AnsiConsole.MarkupLine("[green]Reprint selected[/]");
-                    AnsiConsole.MarkupLine("[dim]Press any key to return...[/]");
-                    Console.ReadKey(true);
+                    var screen = new ReprintScreen(state);
+                    screen.Show();
                 },
                 key: "e",
                 icon: "\uf021"

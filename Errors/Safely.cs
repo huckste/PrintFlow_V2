@@ -61,7 +61,7 @@ public static class Safely
             }
             catch (Exception ex)
             {
-                Thread.Sleep(500);
+                Thread.Sleep(1000);
                 error = Err.FailedTo(Err.Action.Copy, sourceFile, ex.Message);
             }
         }

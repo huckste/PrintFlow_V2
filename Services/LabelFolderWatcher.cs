@@ -61,6 +61,7 @@ public class LabelFolderWatcher
             if (!result.IsError)
             {
                 FileCreated?.Invoke(result.Value);
+
                 Log.Information(
                     "File {File} has been added from {Directory}",
                     Path.GetFileName(e.FullPath),
@@ -69,7 +70,7 @@ public class LabelFolderWatcher
                 return;
             }
 
-            Thread.Sleep(300);
+            Thread.Sleep(1000);
         }
 
         result.LogOnError();
