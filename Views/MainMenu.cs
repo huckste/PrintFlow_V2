@@ -1,4 +1,5 @@
 using PrintFlow_V2.Config;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 using PrintFlow_V2.UI;
 using Spectre.Console;
@@ -49,7 +50,7 @@ public static class MainMenu
                 "Config",
                 () =>
                 {
-                    var pathSchema = ConfigManager.Load();
+                    var pathSchema = ConfigManager.Load().LogOnError();
 
                     if (!pathSchema.IsError)
                     {

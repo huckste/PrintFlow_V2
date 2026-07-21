@@ -1,6 +1,7 @@
 namespace PrintFlow_V2.Models;
 
 using PrintFlow_V2.Config;
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Services;
 using PrintFlow_V2.UI;
 
@@ -24,11 +25,10 @@ public class PrintState(PathSchema pathSchema)
         lock (_lock)
         {
             if (!labels.IsError)
-            {
                 AvailableFiles.AddRange(labels.Value);
-            }
             else
             {
+                labels.Errors.LogToFile();
                 Messages.Error(labels.Errors);
             }
         }

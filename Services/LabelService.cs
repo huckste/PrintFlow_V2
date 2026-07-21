@@ -199,6 +199,6 @@ public class LabelService
             Path.GetFileName(file.OriginalFilePath)
         );
 
-        Safely.Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest);
+        Safely.Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest).LogOnError();
     }
 }

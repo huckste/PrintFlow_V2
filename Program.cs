@@ -17,6 +17,10 @@ try
 {
     await PrintFlowApp.Run();
 }
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Unhandled exception caused application to crash");
+}
 finally
 {
     await Log.CloseAndFlushAsync();

@@ -287,6 +287,7 @@ public class PrintScreen(PrintState state)
                 case Printer.PrinterQueue.Queued:
                     PrinterService
                         .RemoveFromQueue(_state.pathSchema, _state, files, printer)
+                        .LogOnError()
                         .Switch(
                             value =>
                                 markups["success"]

@@ -1,5 +1,6 @@
 namespace PrintFlow_V2.Services;
 
+using PrintFlow_V2.Errors;
 using PrintFlow_V2.Models;
 
 public class ReprintService
@@ -34,24 +35,46 @@ public class ReprintService
         ];
 
         string newFileName = $"{waveNumber}({startLine}-{endLine}){suffix}";
-        File.WriteAllLines(Path.Combine(outputDir, newFileName), result);
+
+        Safely
+            .Run(
+                () => File.WriteAllLines(Path.Combine(outputDir, newFileName), result),
+                Err.Action.Write,
+                Path.Combine(outputDir, newFileName)
+            )
+            .LogOnError();
     }
 
-    public static ReprintContext ReprintByHeader(string filePath)
+    public static ReprintContext? ReprintByHeader(string filePath)
     {
-        string[] lines = File.ReadAllLines(filePath);
+        var result = Safely
+            .Run(
+                () =>
+                {
+                    string[] lines = File.ReadAllLines(filePath);
 
-        Dictionary<string, int> lookup = lines
-            .Select((line, i) => (line, fields: line.Split('^'), i: i + 1))
-            .Where(x => x.fields[TypeField] == HeaderType)
-            .ToDictionary(x => x.fields[WaveSeqNum], x => x.i);
+                    Dictionary<string, int> lookup = lines
+                        .Select((line, i) => (line, fields: line.Split('^'), i: i + 1))
+                        .Where(x => x.fields[TypeField] == HeaderType)
+                        .ToDictionary(x => x.fields[WaveSeqNum], x => x.i);
 
-        return new ReprintContext(lines, lookup, filePath);
+                    return new ReprintContext(lines, lookup, filePath);
+                },
+                Err.Action.Read,
+                filePath
+            )
+            .LogOnError();
+
+        return result.IsError ? null : result.Value;
     }
 
     public static void ReprintByLine(string filePath, int startLine, int endLine)
     {
-        string[] lines = File.ReadAllLines(filePath);
-        WriteReprintFile(lines, filePath, startLine, endLine);
+        var result = Safely
+            .Run(() => File.ReadAllLines(filePath), Err.Action.Read, filePath)
+            .LogOnError();
+
+        if (!result.IsError)
+            WriteReprintFile(result.Value, filePath, startLine, endLine);
     }
 }
