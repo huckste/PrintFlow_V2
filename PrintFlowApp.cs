@@ -3,48 +3,26 @@ namespace PrintFlow_V2;
 using ErrorOr;
 using PrintFlow_V2.Config;
 using PrintFlow_V2.Errors;
-using PrintFlow_V2.Models;
-using PrintFlow_V2.Services;
 using PrintFlow_V2.UI;
-using PrintFlow_V2.Views;
 
 public class PrintFlowApp
 {
-    private static PathSchema _pathSchema = new();
-
-    public static async Task Run()
-    {
-        var ensured = EnsureConfig().LogOnError();
-
-        if (ensured.IsError)
-            return;
-
-        _pathSchema = ensured.Value;
-
-        var state = new PrintState(_pathSchema);
-
-        var printers = PrinterService.GetPrinters(_pathSchema).LogOnError();
-
-        if (!printers.IsError)
-            state.Initialize(printers.Value);
-
-        var menu = new Menu(MainMenu.Items(state));
-        menu.Show();
-    }
-
-    private static ErrorOr<PathSchema> EnsureConfig()
+    public static PathSchema? EnsureConfig()
     {
         if (!ConfigManager.ConfigExists())
         {
-            Messages.Warning(Err.NotFound(Err.NotFoundType.File, "config.json"));
+            Messages.Warning(
+                Err.NotFound(Err.NotFoundType.File, "config.json").Description,
+                "Config Not Found"
+            );
 
-            if (!Prompts.Confirm("Create default config?", false))
-                return Err.FailedTo(Err.Action.Complete, "config setup");
+            if (!Dialogs.Confirm("Create default config?"))
+                return null;
 
             var created = ConfigManager.Create().LogOnError();
 
             if (created.IsError)
-                return created.Errors;
+                return null;
         }
 
         while (true)
@@ -53,8 +31,8 @@ public class PrintFlowApp
 
             if (loaded.IsError)
             {
-                if (!Prompts.Confirm("Open config menu to fix?", false))
-                    return loaded.Errors;
+                if (!Dialogs.Confirm("Config failed to load. Open config menu to fix?"))
+                    return null;
 
                 new ConfigMenu(new PathSchema()).Run();
                 continue;
@@ -70,14 +48,14 @@ public class PrintFlowApp
 
             bool onlyMissingDirs = validation.Errors.All(e => e.Code.Contains("NotFound"));
 
-            if (onlyMissingDirs && Prompts.Confirm("Create missing directories?", false))
+            if (onlyMissingDirs && Dialogs.Confirm("Create missing directories?"))
             {
                 ConfigManager.CreateDirectories(schema).LogOnError();
                 continue;
             }
 
-            if (!Prompts.Confirm("Open config menu to fix?", false))
-                return validation.Errors;
+            if (!Dialogs.Confirm("Open config menu to fix?"))
+                return null;
 
             new ConfigMenu(schema).Run();
         }

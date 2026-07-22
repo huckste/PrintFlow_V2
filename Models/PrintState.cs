@@ -10,6 +10,7 @@ public class PrintState(PathSchema pathSchema)
     public readonly PathSchema pathSchema = pathSchema;
     public List<LabelFile> AvailableFiles { get; } = [];
     public List<Printer> Printers { get; } = [];
+    public event Action? StateChanged;
     private LabelFolderWatcher? _watcher;
     private readonly Lock _lock = new();
 
@@ -42,6 +43,8 @@ public class PrintState(PathSchema pathSchema)
                 if (!AvailableFiles.Any(f => f.Id == label.Id))
                     AvailableFiles.Add(label);
             }
+
+            StateChanged?.Invoke();
         };
 
         _watcher.FileDeleted += (filePath) =>
@@ -53,11 +56,15 @@ public class PrintState(PathSchema pathSchema)
                         af.FilePath.Equals(filePath, StringComparison.OrdinalIgnoreCase)
                     );
             }
+
+            StateChanged?.Invoke();
         };
 
-        // Archive file after it has been completed. Printer will send over the completed file
         foreach (var printer in Printers)
+        {
             printer.FileCompleted += label => LabelService.ArchiveFile(label, pathSchema);
+            printer.QueueChanged += () => StateChanged?.Invoke();
+        }
     }
 
     public void RemoveFiles(List<LabelFile> files)

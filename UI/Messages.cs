@@ -1,85 +1,27 @@
 namespace PrintFlow_V2.UI;
 
 using ErrorOr;
-using Spectre.Console;
-using Spectre.Console.Rendering;
+using Terminal.Gui.Views;
 
-public class Messages
+public static class Messages
 {
-    public static void MessagePanel(
-        MessageType type,
-        string header,
-        string? message = null,
-        List<IRenderable>? rows = null
-    )
-    {
-        Panel panel;
+    public static void Success(string message, string title = "Success") =>
+        MessageBox.Query(TuiApp.App, title, message, "OK");
 
-        (string color, Color borderColor) = type switch
-        {
-            MessageType.Error => ("red", Color.Red),
-            MessageType.Success => ("green", Color.Green),
-            MessageType.Warning => ("yellow", Color.Yellow),
-            _ => ("", Color.Black),
-        };
+    public static void Warning(string message, string title = "Warning") =>
+        MessageBox.Query(TuiApp.App, title, message, "OK");
 
-        if (rows != null && message == null)
-        {
-            panel = new Panel(new Rows(rows))
-                .Header($"[{color}] {rows.Count} {header} [/]")
-                .Border(BoxBorder.Rounded)
-                .BorderColor(borderColor)
-                .Padding(2, 1);
-        }
-        else
-        {
-            var markup = new Markup($"[{color}] {message} [/]");
+    public static void Warning(Error error) =>
+        Warning(error.Description);
 
-            panel = new Panel(markup)
-                .Header($"[{color}] {header} [/]")
-                .Border(BoxBorder.Rounded)
-                .BorderColor(borderColor)
-                .Padding(2, 1);
-        }
-
-        AnsiConsole.Write(panel);
-        Console.ReadKey(true);
-    }
-
-    public static void Success(string success, string? title = null) =>
-        MessagePanel(MessageType.Success, title ?? "Success", success);
-
-    public static void Error(List<Error> errors)
-    {
-        var rows = errors
-            .Select(e => new Markup($"[red]{Markup.Escape(e.Description)}[/]"))
-            .Cast<IRenderable>()
-            .ToList();
-
-        MessagePanel(MessageType.Error, "Error", null, rows);
-    }
+    public static void Error(string message, string title = "Error") =>
+        MessageBox.ErrorQuery(TuiApp.App, title, message, "OK");
 
     public static void Error(Error error) =>
-        MessagePanel(MessageType.Error, "Error", error.Description);
+        Error(error.Description);
 
-    public static void Warning(Error warning) =>
-        MessagePanel(MessageType.Warning, "Warning", warning.Description);
+    public static void Error(List<Error> errors) =>
+        Error(string.Join("\n", errors.Select(e => e.Description)));
 
-    public static void Warning(string warning, string? title = null) =>
-        MessagePanel(MessageType.Warning, title ?? "Warning", warning);
-
-    public static void Empty(int count)
-    {
-        for (int i = 0; i < count; i++)
-        {
-            AnsiConsole.WriteLine();
-        }
-    }
-
-    public enum MessageType
-    {
-        Error,
-        Success,
-        Warning,
-    }
+    public static void Empty(int count = 1) { }
 }

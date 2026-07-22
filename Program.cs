@@ -1,5 +1,7 @@
-﻿using PrintFlow_V2;
+using PrintFlow_V2.UI;
+using PrintFlow_V2.Views;
 using Serilog;
+using Terminal.Gui.App;
 
 string tempPath = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -15,7 +17,13 @@ Log.Logger = new LoggerConfiguration()
 
 try
 {
-    await PrintFlowApp.Run();
+    using IApplication app = Application.Create();
+    app.Init();
+
+    TuiApp.App = app;
+
+    using var window = new MainWindow();
+    app.Run(window);
 }
 catch (Exception ex)
 {

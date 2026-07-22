@@ -21,6 +21,7 @@ public class Printer
     public int MaxLen { get; }
 
     public event Action<LabelFile>? FileCompleted;
+    public event Action? QueueChanged;
 
     public string Id { get; } = Guid.NewGuid().ToString("N")[..8];
 
@@ -124,6 +125,8 @@ public class Printer
 
                     _active.Add(label);
                     Log.Information("Added to active: {File}", label.FileName);
+
+                    QueueChanged?.Invoke();
                 }
             }
         }
@@ -142,8 +145,8 @@ public class Printer
                 _active.RemoveAll(l => l.Id == active.Id);
                 Log.Information("File Completed: {FileName}", active.FileName);
 
-                // when file is completed allow external code to react and archive the file
                 FileCompleted?.Invoke(active);
+                QueueChanged?.Invoke();
             }
 
             // If a file is deleted not due to completing or from a program operation then clear it from queue or else it will be stuck
@@ -166,22 +169,27 @@ public class Printer
             foreach (var file in files)
                 Log.Information("File {File} added to {Queue}", file.FileName, queue);
         }
+
+        QueueChanged?.Invoke();
     }
 
     public List<LabelFile> DequeueFiles(List<LabelFile> files, PrinterQueue queue)
     {
+        List<LabelFile> removed;
+
         lock (_lock)
         {
             List<LabelFile> target = GetTargetQueue(queue);
-            List<LabelFile> removed = [.. target.Where(tf => files.Any(f => f.Id == tf.Id))];
+            removed = [.. target.Where(tf => files.Any(f => f.Id == tf.Id))];
 
             target.RemoveAll(tf => files.Any(f => f.Id == tf.Id));
 
             foreach (var file in files)
                 Log.Information("File {File} removed from {Queue}", file.FileName, queue);
-
-            return removed;
         }
+
+        QueueChanged?.Invoke();
+        return removed;
     }
 
     public void ClearQueue(PrinterQueue queue)
