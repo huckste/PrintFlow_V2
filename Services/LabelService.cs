@@ -159,11 +159,16 @@ public class LabelService
 
     private static string? GetLabelDescByWave(string waveNumber, PathSchema pathSchema)
     {
+        List<string> badExt = [".PKL", ".SNGL"];
+
         var result = Safely.Run(
             () =>
                 Directory
                     .GetFiles(pathSchema.LabelDataLoad.Path)
-                    .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+                    .FirstOrDefault(f =>
+                        Path.GetFileNameWithoutExtension(f) == waveNumber
+                        && !badExt.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase)
+                    ),
             Err.Action.Read,
             pathSchema.LabelDataLoad.Path
         );
@@ -174,7 +179,13 @@ public class LabelService
                 () =>
                     Directory
                         .GetFiles(pathSchema.LabelsDir.Path)
-                        .FirstOrDefault(f => Path.GetFileNameWithoutExtension(f) == waveNumber),
+                        .FirstOrDefault(f =>
+                            Path.GetFileNameWithoutExtension(f) == waveNumber
+                            && !badExt.Contains(
+                                Path.GetExtension(f),
+                                StringComparer.OrdinalIgnoreCase
+                            )
+                        ),
                 Err.Action.Read,
                 pathSchema.LabelsDir.Path
             );
@@ -199,6 +210,8 @@ public class LabelService
             Path.GetFileName(file.OriginalFilePath)
         );
 
-        Safely.Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest).LogOnError();
+        Safely
+            .Run(() => File.Copy(originalPath, dest, overwrite: true), Err.Action.Copy, dest)
+            .LogOnError();
     }
 }
